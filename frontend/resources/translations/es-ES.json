@@ -1,0 +1,61 @@
+{
+  "appName": "AppFlowy",
+  "defaultUsername": "Yo",
+  "welcomeText": "Bienvenido a @:appName",
+  "welcomeTo": "Bienvenido a",
+  "subscribeNewsletterText": "Suscríbete a la newsletter",
+  "letsGoButtonText": "Inicio rápido",
+  "title": "Título",
+  "youCanAlso": "También puedes hacer",
+  "and": "y",
+  "failedToOpenUrl": "Error al abrir la url: {}",
+  "blockActions": {
+    "addBelowTooltip": "Click para añadir a continuación",
+    "addAboveCmd": "Alt+click",
+    "addAboveMacCmd": "Option+click",
+    "addAboveTooltip": "para agregar arriba",
+    "dragTooltip": "Arrastra para mover",
+    "openMenuTooltip": "Click para abrir el menú"
+  },
+  "signUp": {
+    "buttonText": "Regístrate",
+    "title": "Regístrate en @:appName",
+    "getStartedText": "Comenzar",
+    "emptyPasswordError": "La contraseña no puede estar vacía",
+    "repeatPasswordEmptyError": "La contraseña repetida no puede estar vacía",
+    "unmatchedPasswordError": "Las contraseñas no son iguales",
+    "alreadyHaveAnAccount": "¿Ya tienes una cuenta?",
+    "emailHint": "Correo electrónico",
+    "passwordHint": "Contraseña",
+    "repeatPasswordHint": "Repite la contraseña",
+    "signUpWith": "Registrarse con:"
+  },
+  "signIn": {
+    "loginTitle": "Iniciar sesión en @:appName",
+    "loginButtonText": "Iniciar sesión",
+    "loginStartWithAnonymous": "Empezar con una sesión anónima",
+    "continueAnonymousUser": "Continuar con una sesión anónima",
+    "buttonText": "Iniciar sesión",
+    "signingInText": "Iniciando sesión...",
+    "forgotPassword": "¿He olvidado mi contraseña?",
+    "emailHint": "Correo electrónico",
+    "passwordHint": "Contraseña",
+    "dontHaveAnAccount": "¿No tienes una cuenta?",
+    "repeatPasswordEmptyError": "La contraseña repetida no puede estar vacía",
+    "unmatchedPasswordError": "Las contraseñas no son iguales",
+    "syncPromptMessage": "La sincronización de los datos puede tardar un poco. Por favor, no cierres esta página",
+    "or": "O",
+    "LogInWithGoogle": "Iniciar sesión con Google",
+    "LogInWithGithub": "Iniciar sesión con GitHub",
+    "LogInWithDiscord": "Iniciar sesión con Discord",
+    "signInWith": "Iniciar sesión con:"
+  },
+  "workspace": {
+    "chooseWorkspace": "Selecciona tu espacio de trabajo",
+    "create": "Crear espacio de trabajo",
+    "reset": "Reiniciar espacio de trabajo",
+    "resetWorkspacePrompt": "Al restablecer el espacio de trabajo, se eliminarán todas las páginas y los datos que contiene. ¿Está seguro de que desea restablecer el espacio de trabajo? También puede ponerse en contacto con el equipo de soporte técnico para restaurar el espacio de trabajo",
+    "hint": "espacio de trabajo",
+    "notFoundError": "Espacio de trabajo no encontrado"
+  }
+}
