@@ -1,5 +1,5 @@
 use anyhow::Error;
-use collab::core::collab::CollabDocState;
+use collab::core::collab::DataSource;
 use collab::core::origin::CollabOrigin;
 use collab_document::blocks::DocumentData;
 use collab_document::document::Document;
@@ -8,7 +8,7 @@ use tokio::sync::oneshot::channel;
 
 use flowy_document_pub::cloud::{DocumentCloudService, DocumentSnapshot};
 use flowy_error::FlowyError;
-use lib_dispatch::prelude::af_spawn;
+
 use lib_infra::future::FutureResult;
 
 use crate::supabase::api::request::{get_snapshots_from_server, FetchObjectUpdateAction};
@@ -33,11 +33,11 @@ where
     &self,
     document_id: &str,
     workspace_id: &str,
-  ) -> FutureResult<CollabDocState, FlowyError> {
+  ) -> FutureResult<Vec<u8>, FlowyError> {
     let try_get_postgrest = self.server.try_get_weak_postgrest();
     let document_id = document_id.to_string();
     let (tx, rx) = channel();
-    af_spawn(async move {
+    tokio::spawn(async move {
       tx.send(
         async move {
           let postgrest = try_get_postgrest?;
@@ -87,15 +87,19 @@ where
     let try_get_postgrest = self.server.try_get_weak_postgrest();
     let document_id = document_id.to_string();
     let (tx, rx) = channel();
-    af_spawn(async move {
+    tokio::spawn(async move {
       tx.send(
         async move {
           let postgrest = try_get_postgrest?;
           let action =
             FetchObjectUpdateAction::new(document_id.clone(), CollabType::Document, postgrest);
           let doc_state = action.run_with_fix_interval(5, 10).await?;
-          let document =
-            Document::from_doc_state(CollabOrigin::Empty, doc_state, &document_id, vec![])?;
+          let document = Document::open_with_options(
+            CollabOrigin::Empty,
+            DataSource::DocStateV1(doc_state),
+            &document_id,
+            vec![],
+          )?;
           Ok(document.get_document_data().ok())
         }
         .await,

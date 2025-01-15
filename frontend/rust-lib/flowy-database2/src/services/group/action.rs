@@ -1,17 +1,17 @@
 use async_trait::async_trait;
 use collab_database::fields::{Field, TypeOptionData};
-use collab_database::rows::{Cell, Row, RowDetail, RowId};
+use collab_database::rows::{Cell, Cells, Row, RowId};
 
 use flowy_error::FlowyResult;
 
-use crate::entities::{GroupChangesPB, GroupPB, GroupRowsNotificationPB, InsertedGroupPB};
+use crate::entities::{GroupPB, GroupRowsNotificationPB, InsertedGroupPB};
 use crate::services::field::TypeOption;
-use crate::services::group::{GroupChangesets, GroupData, MoveGroupRowContext};
+use crate::services::group::{GroupChangeset, GroupData, MoveGroupRowContext};
 
-/// Using polymorphism to provides the customs action for different group controller.
-///
-/// For example, the `CheckboxGroupController` implements this trait to provide custom behavior.
-///
+/// [GroupCustomize] is implemented by parameterized `BaseGroupController`s to provide different
+/// behaviors. This allows the BaseGroupController to call these actions indescriminantly using
+/// polymorphism.
+#[async_trait]
 pub trait GroupCustomize: Send + Sync {
   type GroupTypeOption: TypeOption;
   /// Returns the a value of the cell if the cell data is not exist.
@@ -33,7 +33,7 @@ pub trait GroupCustomize: Send + Sync {
 
   fn create_or_delete_group_when_cell_changed(
     &mut self,
-    _row_detail: &RowDetail,
+    _row: &Row,
     _old_cell_data: Option<&<Self::GroupTypeOption as TypeOption>::CellProtobufType>,
     _cell_data: &<Self::GroupTypeOption as TypeOption>::CellProtobufType,
   ) -> FlowyResult<(Option<InsertedGroupPB>, Option<GroupPB>)> {
@@ -45,7 +45,7 @@ pub trait GroupCustomize: Send + Sync {
   ///
   fn add_or_remove_row_when_cell_changed(
     &mut self,
-    row_detail: &RowDetail,
+    row: &Row,
     cell_data: &<Self::GroupTypeOption as TypeOption>::CellProtobufType,
   ) -> Vec<GroupRowsNotificationPB>;
 
@@ -57,14 +57,10 @@ pub trait GroupCustomize: Send + Sync {
   ) -> (Option<GroupPB>, Vec<GroupRowsNotificationPB>);
 
   /// Move row from one group to another
-  fn move_row(
-    &mut self,
-    cell_data: &<Self::GroupTypeOption as TypeOption>::CellProtobufType,
-    context: MoveGroupRowContext,
-  ) -> Vec<GroupRowsNotificationPB>;
+  fn move_row(&mut self, context: MoveGroupRowContext) -> Vec<GroupRowsNotificationPB>;
 
   /// Returns None if there is no need to delete the group when corresponding row get removed
-  fn delete_group_when_move_row(
+  fn delete_group_after_moving_row(
     &mut self,
     _row: &Row,
     _cell_data: &<Self::GroupTypeOption as TypeOption>::CellProtobufType,
@@ -72,21 +68,39 @@ pub trait GroupCustomize: Send + Sync {
     None
   }
 
-  fn generate_new_group(
+  async fn create_group(
     &mut self,
     _name: String,
   ) -> FlowyResult<(Option<TypeOptionData>, Option<InsertedGroupPB>)> {
     Ok((None, None))
   }
 
-  fn delete_group_custom(&mut self, group_id: &str) -> FlowyResult<Option<TypeOptionData>>;
+  async fn delete_group(&mut self, group_id: &str) -> FlowyResult<Option<TypeOptionData>>;
+
+  fn update_type_option_when_update_group(
+    &mut self,
+    _changeset: &GroupChangeset,
+    _type_option: &Self::GroupTypeOption,
+  ) -> Option<Self::GroupTypeOption> {
+    None
+  }
+
+  fn will_create_row(&self, cells: &mut Cells, field: &Field, group_id: &str);
 }
 
-/// Defines the shared actions any group controller can perform.
+/// The `GroupController` trait defines the behavior of the group controller when performing any
+/// group-related tasks, such as managing rows within a group, transferring rows between groups,
+/// manipulating groups themselves, and even pre-filling a row's cells before it is created.
+///
+/// Depending on the type of the field that is being grouped, a parameterized `BaseGroupController`
+/// or a `DefaultGroupController` may be the actual object that provides the functionality of
+/// this trait. For example, a `Single-Select` group controller will be a `BaseGroupController`,
+/// while a `URL` group controller will be a `DefaultGroupController`.
 #[async_trait]
-pub trait GroupControllerOperation: Send + Sync {
+pub trait GroupController: Send + Sync {
+  async fn load_group_data(&mut self) -> FlowyResult<()>;
   /// Returns the id of field that is being used to group the rows
-  fn field_id(&self) -> &str;
+  fn get_grouping_field_id(&self) -> &str;
 
   /// Returns all of the groups currently managed by the controller
   fn get_all_groups(&self) -> Vec<&GroupData>;
@@ -100,14 +114,14 @@ pub trait GroupControllerOperation: Send + Sync {
   ///
   /// * `rows`: rows to be inserted
   /// * `field`: reference to the field being sorted (currently unused)
-  fn fill_groups(&mut self, rows: &[&RowDetail], field: &Field) -> FlowyResult<()>;
+  fn fill_groups(&mut self, rows: &[&Row], field: &Field) -> FlowyResult<()>;
 
   /// Create a new group, currently only supports single and multi-select.
   ///
   /// Returns a new type option data for the grouping field if it's altered.
   ///
   /// * `name`: name of the new group
-  fn create_group(
+  async fn create_group(
     &mut self,
     name: String,
   ) -> FlowyResult<(Option<TypeOptionData>, Option<InsertedGroupPB>)>;
@@ -124,11 +138,7 @@ pub trait GroupControllerOperation: Send + Sync {
   /// Returns a changeset payload to be sent as a notification.
   ///
   /// * `row_detail`: the newly-created row
-  fn did_create_row(
-    &mut self,
-    row_detail: &RowDetail,
-    index: usize,
-  ) -> Vec<GroupRowsNotificationPB>;
+  fn did_create_row(&mut self, row: &Row, index: usize) -> Vec<GroupRowsNotificationPB>;
 
   /// Called after a row's cell data is changed, this moves the row to the
   /// correct group. It may also insert a new group and/or remove an old group.
@@ -140,8 +150,8 @@ pub trait GroupControllerOperation: Send + Sync {
   /// * `field`:
   fn did_update_group_row(
     &mut self,
-    old_row_detail: &Option<RowDetail>,
-    row_detail: &RowDetail,
+    old_row: &Option<Row>,
+    new_row: &Row,
     field: &Field,
   ) -> FlowyResult<DidUpdateGroupRowResult>;
 
@@ -156,18 +166,16 @@ pub trait GroupControllerOperation: Send + Sync {
   /// * `context`: information about the row being moved and its destination
   fn move_group_row(&mut self, context: MoveGroupRowContext) -> FlowyResult<DidMoveGroupRowResult>;
 
-  /// Updates the groups after a field change. (currently never does anything)
-  ///
-  /// * `field`: new changeset
-  fn did_update_group_field(&mut self, field: &Field) -> FlowyResult<Option<GroupChangesPB>>;
-
   /// Delete a group from the group configuration.
   ///
   /// Return a list of deleted row ids and/or a new `TypeOptionData` if
   /// successful.
   ///
   /// * `group_id`: the id of the group to be deleted
-  fn delete_group(&mut self, group_id: &str) -> FlowyResult<(Vec<RowId>, Option<TypeOptionData>)>;
+  async fn delete_group(
+    &mut self,
+    group_id: &str,
+  ) -> FlowyResult<(Vec<RowId>, Option<TypeOptionData>)>;
 
   /// Updates the name and/or visibility of groups.
   ///
@@ -177,8 +185,11 @@ pub trait GroupControllerOperation: Send + Sync {
   /// * `changesets`: list of changesets to be made to one or more groups
   async fn apply_group_changeset(
     &mut self,
-    changesets: &GroupChangesets,
-  ) -> FlowyResult<(Vec<GroupPB>, TypeOptionData)>;
+    changesets: &[GroupChangeset],
+  ) -> FlowyResult<(Vec<GroupPB>, Option<TypeOptionData>)>;
+
+  /// Called before the row was created.
+  fn will_create_row(&self, cells: &mut Cells, field: &Field, group_id: &str);
 }
 
 #[derive(Debug)]

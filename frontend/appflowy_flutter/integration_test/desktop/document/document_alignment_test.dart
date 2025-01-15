@@ -14,7 +14,7 @@ void main() {
   group('document alignment', () {
     testWidgets('edit alignment in toolbar', (tester) async {
       await tester.initializeAppFlowy();
-      await tester.tapGoButton();
+      await tester.tapAnonymousSignInButton();
 
       final selection = Selection.single(
         path: [0],
@@ -48,7 +48,7 @@ void main() {
 
     testWidgets('edit alignment using shortcut', (tester) async {
       await tester.initializeAppFlowy();
-      await tester.tapGoButton();
+      await tester.tapAnonymousSignInButton();
 
       // click the first line of the readme
       await tester.editor.tapLineOfEditorAt(0);
@@ -66,6 +66,7 @@ void main() {
           LogicalKeyboardKey.keyR,
         ],
         tester: tester,
+        withKeyUp: true,
       );
       expect(first.attributes[blockComponentAlign], rightAlignmentKey);
 
@@ -77,6 +78,7 @@ void main() {
           LogicalKeyboardKey.keyE,
         ],
         tester: tester,
+        withKeyUp: true,
       );
       expect(first.attributes[blockComponentAlign], centerAlignmentKey);
 
@@ -88,6 +90,7 @@ void main() {
           LogicalKeyboardKey.keyL,
         ],
         tester: tester,
+        withKeyUp: true,
       );
       expect(first.attributes[blockComponentAlign], leftAlignmentKey);
     });

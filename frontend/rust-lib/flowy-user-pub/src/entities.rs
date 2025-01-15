@@ -1,6 +1,8 @@
 use std::str::FromStr;
 
 use chrono::{DateTime, Utc};
+pub use client_api::entity::billing_dto::RecurringInterval;
+use client_api::entity::AFRole;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use serde_repr::*;
@@ -139,19 +141,25 @@ pub struct UserWorkspace {
   pub created_at: DateTime<Utc>,
   /// The database storage id is used indexing all the database views in current workspace.
   #[serde(rename = "database_storage_id")]
-  pub workspace_database_object_id: String,
+  pub workspace_database_id: String,
   #[serde(default)]
   pub icon: String,
+  #[serde(default)]
+  pub member_count: i64,
+  #[serde(default)]
+  pub role: Option<Role>,
 }
 
 impl UserWorkspace {
-  pub fn new(workspace_id: &str, _uid: i64) -> Self {
+  pub fn new_local(workspace_id: &str, _uid: i64) -> Self {
     Self {
       id: workspace_id.to_string(),
       name: "".to_string(),
       created_at: Utc::now(),
-      workspace_database_object_id: Uuid::new_v4().to_string(),
+      workspace_database_id: Uuid::new_v4().to_string(),
       icon: "".to_string(),
+      member_count: 1,
+      role: None,
     }
   }
 }
@@ -166,11 +174,11 @@ pub struct UserProfile {
   pub icon_url: String,
   pub openai_key: String,
   pub stability_ai_key: String,
-  pub workspace_id: String,
   pub authenticator: Authenticator,
   // If the encryption_sign is not empty, which means the user has enabled the encryption.
   pub encryption_type: EncryptionType,
   pub updated_at: i64,
+  pub ai_model: String,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, Default, Eq, PartialEq)]
@@ -244,11 +252,11 @@ where
       token: value.user_token().unwrap_or_default(),
       icon_url,
       openai_key,
-      workspace_id: value.latest_workspace().id.to_owned(),
       authenticator: auth_type.clone(),
       encryption_type: value.encryption_type(),
       stability_ai_key,
       updated_at: value.updated_at(),
+      ai_model: "".to_string(),
     }
   }
 }
@@ -264,6 +272,7 @@ pub struct UpdateUserProfileParams {
   pub stability_ai_key: Option<String>,
   pub encryption_sign: Option<String>,
   pub token: Option<String>,
+  pub ai_model: Option<String>,
 }
 
 impl UpdateUserProfileParams {
@@ -318,6 +327,11 @@ impl UpdateUserProfileParams {
     self
   }
 
+  pub fn with_ai_model(mut self, ai_model: &str) -> Self {
+    self.ai_model = Some(ai_model.to_owned());
+    self
+  }
+
   pub fn is_empty(&self) -> bool {
     self.name.is_none()
       && self.email.is_none()
@@ -337,8 +351,6 @@ pub enum Authenticator {
   /// Currently not supported. It will be supported in the future when the
   /// [AppFlowy-Server](https://github.com/AppFlowy-IO/AppFlowy-Server) ready.
   AppFlowyCloud = 1,
-  /// It uses Supabase as the backend.
-  Supabase = 2,
 }
 
 impl Default for Authenticator {
@@ -362,7 +374,6 @@ impl From<i32> for Authenticator {
     match value {
       0 => Authenticator::Local,
       1 => Authenticator::AppFlowyCloud,
-      2 => Authenticator::Supabase,
       _ => Authenticator::Local,
     }
   }
@@ -383,19 +394,74 @@ pub enum UserTokenState {
   Invalid,
 }
 
-#[derive(Clone, Debug)]
+// Workspace Role
+#[derive(Clone, Debug, Serialize_repr, Deserialize_repr)]
+#[repr(u8)]
 pub enum Role {
-  Owner,
-  Member,
-  Guest,
+  Owner = 0,
+  Member = 1,
+  Guest = 2,
+}
+
+impl From<i32> for Role {
+  fn from(value: i32) -> Self {
+    match value {
+      0 => Role::Owner,
+      1 => Role::Member,
+      2 => Role::Guest,
+      _ => Role::Guest,
+    }
+  }
+}
+
+impl From<Role> for i32 {
+  fn from(value: Role) -> Self {
+    match value {
+      Role::Owner => 0,
+      Role::Member => 1,
+      Role::Guest => 2,
+    }
+  }
+}
+
+impl From<AFRole> for Role {
+  fn from(value: AFRole) -> Self {
+    match value {
+      AFRole::Owner => Role::Owner,
+      AFRole::Member => Role::Member,
+      AFRole::Guest => Role::Guest,
+    }
+  }
 }
 
 pub struct WorkspaceMember {
   pub email: String,
   pub role: Role,
   pub name: String,
+  pub avatar_url: Option<String>,
 }
 
-pub fn awareness_oid_from_user_uuid(user_uuid: &Uuid) -> Uuid {
-  Uuid::new_v5(user_uuid, b"user_awareness")
+/// represent the user awareness object id for the workspace.
+pub fn user_awareness_object_id(user_uuid: &Uuid, workspace_id: &str) -> Uuid {
+  Uuid::new_v5(
+    user_uuid,
+    format!("user_awareness:{}", workspace_id).as_bytes(),
+  )
+}
+
+#[derive(Clone, Debug)]
+pub enum WorkspaceInvitationStatus {
+  Pending,
+  Accepted,
+  Rejected,
+}
+
+pub struct WorkspaceInvitation {
+  pub invite_id: Uuid,
+  pub workspace_id: Uuid,
+  pub workspace_name: Option<String>,
+  pub inviter_email: Option<String>,
+  pub inviter_name: Option<String>,
+  pub status: WorkspaceInvitationStatus,
+  pub updated_at: DateTime<Utc>,
 }

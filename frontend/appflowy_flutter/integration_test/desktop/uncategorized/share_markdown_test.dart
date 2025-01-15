@@ -1,6 +1,6 @@
 import 'dart:io';
 
-import 'package:appflowy/plugins/document/presentation/share/share_button.dart';
+import 'package:appflowy/plugins/shared/share/share_button.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
 import 'package:path/path.dart' as p;
@@ -14,7 +14,7 @@ void main() {
   group('share markdown in document page', () {
     testWidgets('click the share button in document page', (tester) async {
       final context = await tester.initializeAppFlowy();
-      await tester.tapGoButton();
+      await tester.tapAnonymousSignInButton();
 
       // mock the file picker
       final path = await mockSaveFilePath(
@@ -38,7 +38,7 @@ void main() {
       'share the markdown after renaming the document name',
       (tester) async {
         final context = await tester.initializeAppFlowy();
-        await tester.tapGoButton();
+        await tester.tapAnonymousSignInButton();
 
         // expect to see a getting started page
         tester.expectToSeePageName(gettingStarted);
@@ -51,13 +51,13 @@ void main() {
           },
         );
 
-        final shareButton = find.byType(ShareActionList);
-        final shareButtonState =
-            tester.state(shareButton) as ShareActionListState;
+        final shareButton = find.byType(ShareButton);
+        final shareButtonState = tester.widget(shareButton) as ShareButton;
+
         final path = await mockSaveFilePath(
           p.join(
             context.applicationDataDirectory,
-            '${shareButtonState.name}.md',
+            '${shareButtonState.view.name}.md',
           ),
         );
 

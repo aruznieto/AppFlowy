@@ -1,6 +1,5 @@
-use client_api::error::{AppResponseError, ErrorCode as AppErrorCode};
-
 use crate::{ErrorCode, FlowyError};
+use client_api::error::{AppResponseError, ErrorCode as AppErrorCode};
 
 impl From<AppResponseError> for FlowyError {
   fn from(error: AppResponseError) -> Self {
@@ -15,12 +14,29 @@ impl From<AppResponseError> for FlowyError {
       AppErrorCode::MissingPayload => ErrorCode::MissingPayload,
       AppErrorCode::OpenError => ErrorCode::Internal,
       AppErrorCode::InvalidUrl => ErrorCode::InvalidURL,
-      AppErrorCode::InvalidRequest => ErrorCode::InvalidParams,
+      AppErrorCode::InvalidRequest => ErrorCode::InvalidRequest,
       AppErrorCode::InvalidOAuthProvider => ErrorCode::InvalidAuthConfig,
       AppErrorCode::NotLoggedIn => ErrorCode::UserUnauthorized,
       AppErrorCode::NotEnoughPermissions => ErrorCode::NotEnoughPermissions,
       AppErrorCode::NetworkError => ErrorCode::HttpError,
-      AppErrorCode::PayloadTooLarge => ErrorCode::CloudRequestPayloadTooLarge,
+      AppErrorCode::PayloadTooLarge => ErrorCode::PayloadTooLarge,
+      AppErrorCode::UserUnAuthorized => ErrorCode::UserUnauthorized,
+      AppErrorCode::WorkspaceLimitExceeded => ErrorCode::WorkspaceLimitExceeded,
+      AppErrorCode::WorkspaceMemberLimitExceeded => ErrorCode::WorkspaceMemberLimitExceeded,
+      AppErrorCode::AIResponseLimitExceeded => ErrorCode::AIResponseLimitExceeded,
+      AppErrorCode::FileStorageLimitExceeded => ErrorCode::FileStorageLimitExceeded,
+      AppErrorCode::SingleUploadLimitExceeded => ErrorCode::SingleUploadLimitExceeded,
+      AppErrorCode::CustomNamespaceDisabled => ErrorCode::CustomNamespaceRequirePlanUpgrade,
+      AppErrorCode::CustomNamespaceDisallowed => ErrorCode::CustomNamespaceNotAllowed,
+      AppErrorCode::PublishNamespaceAlreadyTaken => ErrorCode::CustomNamespaceAlreadyTaken,
+      AppErrorCode::CustomNamespaceTooShort => ErrorCode::CustomNamespaceTooShort,
+      AppErrorCode::CustomNamespaceTooLong => ErrorCode::CustomNamespaceTooLong,
+      AppErrorCode::CustomNamespaceReserved => ErrorCode::CustomNamespaceReserved,
+      AppErrorCode::PublishNameAlreadyExists => ErrorCode::PublishNameAlreadyExists,
+      AppErrorCode::PublishNameInvalidCharacter => ErrorCode::PublishNameInvalidCharacter,
+      AppErrorCode::PublishNameTooLong => ErrorCode::PublishNameTooLong,
+      AppErrorCode::CustomNamespaceInvalidCharacter => ErrorCode::CustomNamespaceInvalidCharacter,
+      AppErrorCode::AIServiceUnavailable => ErrorCode::AIServiceUnavailable,
       _ => ErrorCode::Internal,
     };
 

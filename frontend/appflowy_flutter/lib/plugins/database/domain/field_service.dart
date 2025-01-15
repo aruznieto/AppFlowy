@@ -20,6 +20,7 @@ class FieldBackendService {
     required String viewId,
     FieldType fieldType = FieldType.RichText,
     String? fieldName,
+    String? icon,
     Uint8List? typeOptionData,
     OrderObjectPositionPB? position,
   }) {
@@ -62,6 +63,19 @@ class FieldBackendService {
     return DatabaseEventDeleteField(payload).send();
   }
 
+  // Clear all data of all cells in a Field
+  static Future<FlowyResult<void, FlowyError>> clearField({
+    required String viewId,
+    required String fieldId,
+  }) {
+    final payload = ClearFieldPayloadPB(
+      viewId: viewId,
+      fieldId: fieldId,
+    );
+
+    return DatabaseEventClearField(payload).send();
+  }
+
   /// Duplicate a field
   static Future<FlowyResult<void, FlowyError>> duplicateField({
     required String viewId,
@@ -75,6 +89,7 @@ class FieldBackendService {
   /// Update a field's properties
   Future<FlowyResult<void, FlowyError>> updateField({
     String? name,
+    String? icon,
     bool? frozen,
   }) {
     final payload = FieldChangesetPB.create()
@@ -83,6 +98,10 @@ class FieldBackendService {
 
     if (name != null) {
       payload.name = name;
+    }
+
+    if (icon != null) {
+      payload.icon = icon;
     }
 
     if (frozen != null) {
@@ -97,11 +116,17 @@ class FieldBackendService {
     required String viewId,
     required String fieldId,
     required FieldType fieldType,
+    String? fieldName,
   }) {
     final payload = UpdateFieldTypePayloadPB()
       ..viewId = viewId
       ..fieldId = fieldId
       ..fieldType = fieldType;
+
+    // Only set if fieldName is not null
+    if (fieldName != null) {
+      payload.fieldName = fieldName;
+    }
 
     return DatabaseEventUpdateFieldType(payload).send();
   }
@@ -164,11 +189,13 @@ class FieldBackendService {
 
   Future<FlowyResult<void, FlowyError>> updateType({
     required FieldType fieldType,
+    String? fieldName,
   }) =>
       updateFieldType(
         viewId: viewId,
         fieldId: fieldId,
         fieldType: fieldType,
+        fieldName: fieldName,
       );
 
   Future<FlowyResult<void, FlowyError>> delete() =>

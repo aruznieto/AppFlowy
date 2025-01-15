@@ -1,5 +1,5 @@
 import 'package:appflowy/workspace/application/sidebar/folder/folder_bloc.dart';
-import 'package:appflowy/workspace/presentation/home/menu/sidebar/folder/favorite_folder.dart';
+import 'package:appflowy/workspace/presentation/home/menu/sidebar/favorites/favorite_folder.dart';
 import 'package:appflowy/workspace/presentation/home/menu/view/view_item.dart';
 import 'package:appflowy_popover/appflowy_popover.dart';
 import 'package:flowy_infra_ui/style_widget/hover.dart';
@@ -18,7 +18,7 @@ void main() {
         'Toggle favorites for views creates / removes the favorite header along with favorite views',
         (tester) async {
       await tester.initializeAppFlowy();
-      await tester.tapGoButton();
+      await tester.tapAnonymousSignInButton();
 
       // no favorite folder
       expect(find.byType(FavoriteFolder), findsNothing);
@@ -46,7 +46,7 @@ void main() {
       await tester.favoriteViewByName(names[1]);
       expect(
         tester.findFavoritePageName(names[1]),
-        findsNWidgets(2),
+        findsNWidgets(1),
       );
 
       await tester.unfavoriteViewByName(gettingStarted);
@@ -74,7 +74,7 @@ void main() {
       'renaming a favorite view updates name under favorite header',
       (tester) async {
         await tester.initializeAppFlowy();
-        await tester.tapGoButton();
+        await tester.tapAnonymousSignInButton();
 
         const name = 'test';
         await tester.favoriteViewByName(gettingStarted);
@@ -100,7 +100,7 @@ void main() {
       'deleting first level favorite view removes its instance from favorite header, deleting root level views leads to removal of all favorites that are its children',
       (tester) async {
         await tester.initializeAppFlowy();
-        await tester.tapGoButton();
+        await tester.tapAnonymousSignInButton();
 
         final names = [1, 2].map((e) => 'document_$e').toList();
         for (var i = 0; i < names.length; i++) {
@@ -120,9 +120,9 @@ void main() {
             (widget) =>
                 widget is SingleInnerViewItem &&
                 widget.view.isFavorite &&
-                widget.categoryType == FolderCategoryType.favorite,
+                widget.spaceType == FolderSpaceType.favorite,
           ),
-          findsNWidgets(6),
+          findsNWidgets(3),
         );
 
         await tester.hoverOnPageName(
@@ -135,7 +135,7 @@ void main() {
 
         expect(
           tester.findAllFavoritePages(),
-          findsNWidgets(3),
+          findsNWidgets(2),
         );
 
         await tester.hoverOnPageName(
@@ -157,7 +157,7 @@ void main() {
       'view selection is synced between favorites and personal folder',
       (tester) async {
         await tester.initializeAppFlowy();
-        await tester.tapGoButton();
+        await tester.tapAnonymousSignInButton();
 
         await tester.createNewPageWithNameUnderParent();
         await tester.favoriteViewByName(gettingStarted);
@@ -168,7 +168,7 @@ void main() {
                 widget.isSelected != null &&
                 widget.isSelected!(),
           ),
-          findsNWidgets(2),
+          findsNWidgets(1),
         );
       },
     );
@@ -177,7 +177,7 @@ void main() {
       'context menu opens up for favorites',
       (tester) async {
         await tester.initializeAppFlowy();
-        await tester.tapGoButton();
+        await tester.tapAnonymousSignInButton();
 
         await tester.createNewPageWithNameUnderParent();
         await tester.favoriteViewByName(gettingStarted);
@@ -194,6 +194,59 @@ void main() {
           },
         );
         await tester.pumpAndSettle();
+      },
+    );
+
+    testWidgets(
+      'reorder favorites',
+      (tester) async {
+        await tester.initializeAppFlowy();
+        await tester.tapAnonymousSignInButton();
+
+        /// there are no favorite views
+        final favorites = find.descendant(
+          of: find.byType(FavoriteFolder),
+          matching: find.byType(ViewItem),
+        );
+        expect(favorites, findsNothing);
+
+        /// create views and then favorite them
+        const pageNames = ['001', '002', '003'];
+        for (final name in pageNames) {
+          await tester.createNewPageWithNameUnderParent(name: name);
+        }
+        for (final name in pageNames) {
+          await tester.favoriteViewByName(name);
+        }
+        expect(favorites, findsNWidgets(pageNames.length));
+
+        final oldNames = favorites
+            .evaluate()
+            .map((e) => (e.widget as ViewItem).view.name)
+            .toList();
+        expect(oldNames, pageNames);
+
+        /// drag first to last
+        await tester.reorderFavorite(
+          fromName: '001',
+          toName: '003',
+        );
+        List<String> newNames = favorites
+            .evaluate()
+            .map((e) => (e.widget as ViewItem).view.name)
+            .toList();
+        expect(newNames, ['002', '003', '001']);
+
+        /// drag first to second
+        await tester.reorderFavorite(
+          fromName: '002',
+          toName: '003',
+        );
+        newNames = favorites
+            .evaluate()
+            .map((e) => (e.widget as ViewItem).view.name)
+            .toList();
+        expect(newNames, ['003', '002', '001']);
       },
     );
   });

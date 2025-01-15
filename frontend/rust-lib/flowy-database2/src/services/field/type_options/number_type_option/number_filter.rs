@@ -1,9 +1,13 @@
 use std::str::FromStr;
 
+use collab_database::fields::number_type_option::NumberCellFormat;
+use collab_database::fields::Field;
+use collab_database::rows::Cell;
 use rust_decimal::Decimal;
 
 use crate::entities::{NumberFilterConditionPB, NumberFilterPB};
-use crate::services::field::NumberCellFormat;
+use crate::services::cell::insert_text_cell;
+use crate::services::filter::PreFillCellsWithFilter;
 
 impl NumberFilterPB {
   pub fn is_visible(&self, cell_data: &NumberCellFormat) -> Option<bool> {
@@ -30,6 +34,37 @@ impl NumberFilterPB {
   }
 }
 
+impl PreFillCellsWithFilter for NumberFilterPB {
+  fn get_compliant_cell(&self, field: &Field) -> Option<Cell> {
+    let expected_decimal = || Decimal::from_str(&self.content).ok();
+
+    let text = match self.condition {
+      NumberFilterConditionPB::Equal
+      | NumberFilterConditionPB::GreaterThanOrEqualTo
+      | NumberFilterConditionPB::LessThanOrEqualTo
+        if !self.content.is_empty() =>
+      {
+        Some(self.content.clone())
+      },
+      NumberFilterConditionPB::GreaterThan if !self.content.is_empty() => {
+        expected_decimal().map(|value| {
+          let answer = value + Decimal::from_f32_retain(1.0).unwrap();
+          answer.to_string()
+        })
+      },
+      NumberFilterConditionPB::LessThan if !self.content.is_empty() => {
+        expected_decimal().map(|value| {
+          let answer = value - Decimal::from_f32_retain(1.0).unwrap();
+          answer.to_string()
+        })
+      },
+      _ => None,
+    };
+
+    // use `insert_text_cell` because self.content might not be a parsable i64.
+    text.map(|s| insert_text_cell(s, field))
+  }
+}
 enum NumberFilterStrategy {
   Equal(Decimal),
   NotEqual(Decimal),
@@ -71,7 +106,7 @@ impl NumberFilterStrategy {
 #[cfg(test)]
 mod tests {
   use crate::entities::{NumberFilterConditionPB, NumberFilterPB};
-  use crate::services::field::{NumberCellFormat, NumberFormat};
+  use collab_database::fields::number_type_option::{NumberCellFormat, NumberFormat};
 
   #[test]
   fn number_filter_equal_test() {

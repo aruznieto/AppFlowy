@@ -1,3 +1,4 @@
+import 'package:appflowy/util/field_type_extension.dart';
 import 'package:appflowy_backend/protobuf/flowy-database2/field_entities.pbenum.dart';
 import 'package:appflowy_backend/protobuf/flowy-folder/protobuf.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -13,7 +14,7 @@ void main() {
   group('edit grid cell:', () {
     testWidgets('text', (tester) async {
       await tester.initializeAppFlowy();
-      await tester.tapGoButton();
+      await tester.tapAnonymousSignInButton();
 
       await tester.createNewPageWithNameUnderParent(layout: ViewLayoutPB.Grid);
 
@@ -36,12 +37,12 @@ void main() {
     // multiple text cell
     testWidgets('multiple text cells', (tester) async {
       await tester.initializeAppFlowy();
-      await tester.tapGoButton();
+      await tester.tapAnonymousSignInButton();
       await tester.createNewPageWithNameUnderParent(
         name: 'my grid',
         layout: ViewLayoutPB.Grid,
       );
-      await tester.createField(FieldType.RichText, 'description');
+      await tester.createField(FieldType.RichText, name: 'description');
 
       await tester.editCell(
         rowIndex: 0,
@@ -74,14 +75,14 @@ void main() {
 
     testWidgets('number', (tester) async {
       await tester.initializeAppFlowy();
-      await tester.tapGoButton();
+      await tester.tapAnonymousSignInButton();
 
       await tester.createNewPageWithNameUnderParent(layout: ViewLayoutPB.Grid);
 
       const fieldType = FieldType.Number;
 
       // Create a number field
-      await tester.createField(fieldType, fieldType.name);
+      await tester.createField(fieldType);
 
       await tester.editCell(
         rowIndex: 0,
@@ -132,7 +133,7 @@ void main() {
 
     testWidgets('checkbox', (tester) async {
       await tester.initializeAppFlowy();
-      await tester.tapGoButton();
+      await tester.tapAnonymousSignInButton();
 
       await tester.createNewPageWithNameUnderParent(layout: ViewLayoutPB.Grid);
 
@@ -150,14 +151,14 @@ void main() {
 
     testWidgets('created time', (tester) async {
       await tester.initializeAppFlowy();
-      await tester.tapGoButton();
+      await tester.tapAnonymousSignInButton();
 
       await tester.createNewPageWithNameUnderParent(layout: ViewLayoutPB.Grid);
 
       const fieldType = FieldType.CreatedTime;
       // Create a create time field
       // The create time field is not editable
-      await tester.createField(fieldType, fieldType.name);
+      await tester.createField(fieldType);
 
       await tester.tapCellInGrid(rowIndex: 0, fieldType: fieldType);
 
@@ -168,14 +169,14 @@ void main() {
 
     testWidgets('last modified time', (tester) async {
       await tester.initializeAppFlowy();
-      await tester.tapGoButton();
+      await tester.tapAnonymousSignInButton();
 
       await tester.createNewPageWithNameUnderParent(layout: ViewLayoutPB.Grid);
 
       const fieldType = FieldType.LastEditedTime;
       // Create a last time field
       // The last time field is not editable
-      await tester.createField(fieldType, fieldType.name);
+      await tester.createField(fieldType);
 
       await tester.tapCellInGrid(rowIndex: 0, fieldType: fieldType);
 
@@ -186,12 +187,12 @@ void main() {
 
     testWidgets('date time', (tester) async {
       await tester.initializeAppFlowy();
-      await tester.tapGoButton();
+      await tester.tapAnonymousSignInButton();
 
       await tester.createNewPageWithNameUnderParent(layout: ViewLayoutPB.Grid);
 
       const fieldType = FieldType.DateTime;
-      await tester.createField(fieldType, fieldType.name);
+      await tester.createField(fieldType);
 
       // Tap the cell to invoke the field editor
       await tester.tapCellInGrid(rowIndex: 0, fieldType: fieldType);
@@ -210,21 +211,21 @@ void main() {
       await tester.toggleIncludeTime();
 
       // Select a date
-      final today = DateTime.now();
-      await tester.selectDay(content: today.day);
+      DateTime now = DateTime.now();
+      await tester.selectDay(content: now.day);
 
       await tester.dismissCellEditor();
 
       tester.assertCellContent(
         rowIndex: 0,
         fieldType: FieldType.DateTime,
-        content: DateFormat('MMM dd, y').format(today),
+        content: DateFormat('MMM dd, y').format(now),
       );
 
       await tester.tapCellInGrid(rowIndex: 0, fieldType: fieldType);
 
       // Toggle include time
-      final now = DateTime.now();
+      now = DateTime.now();
       await tester.toggleIncludeTime();
 
       await tester.dismissCellEditor();
@@ -282,7 +283,7 @@ void main() {
 
     testWidgets('single select', (tester) async {
       await tester.initializeAppFlowy();
-      await tester.tapGoButton();
+      await tester.tapAnonymousSignInButton();
 
       const fieldType = FieldType.SingleSelect;
 
@@ -298,7 +299,7 @@ void main() {
       await tester.dismissCellEditor();
 
       // Make sure the option is created and displayed in the cell
-      await tester.findSelectOptionWithNameInGrid(
+      tester.findSelectOptionWithNameInGrid(
         rowIndex: 0,
         name: 'tag 1',
       );
@@ -310,12 +311,12 @@ void main() {
       await tester.createOption(name: 'tag 2');
       await tester.dismissCellEditor();
 
-      await tester.findSelectOptionWithNameInGrid(
+      tester.findSelectOptionWithNameInGrid(
         rowIndex: 0,
         name: 'tag 2',
       );
 
-      await tester.assertNumberOfSelectedOptionsInGrid(
+      tester.assertNumberOfSelectedOptionsInGrid(
         rowIndex: 0,
         matcher: findsOneWidget,
       );
@@ -327,12 +328,12 @@ void main() {
       await tester.selectOption(name: 'tag 1');
       await tester.dismissCellEditor();
 
-      await tester.findSelectOptionWithNameInGrid(
+      tester.findSelectOptionWithNameInGrid(
         rowIndex: 0,
         name: 'tag 1',
       );
 
-      await tester.assertNumberOfSelectedOptionsInGrid(
+      tester.assertNumberOfSelectedOptionsInGrid(
         rowIndex: 0,
         matcher: findsOneWidget,
       );
@@ -344,7 +345,7 @@ void main() {
       await tester.selectOption(name: 'tag 1');
       await tester.dismissCellEditor();
 
-      await tester.assertNumberOfSelectedOptionsInGrid(
+      tester.assertNumberOfSelectedOptionsInGrid(
         rowIndex: 0,
         matcher: findsNothing,
       );
@@ -361,12 +362,12 @@ void main() {
       ];
 
       await tester.initializeAppFlowy();
-      await tester.tapGoButton();
+      await tester.tapAnonymousSignInButton();
 
       await tester.createNewPageWithNameUnderParent(layout: ViewLayoutPB.Grid);
 
       const fieldType = FieldType.MultiSelect;
-      await tester.createField(fieldType, fieldType.name);
+      await tester.createField(fieldType, name: fieldType.i18n);
 
       // Tap the cell to invoke the selection option editor
       await tester.tapSelectOptionCellInGrid(rowIndex: 0, fieldType: fieldType);
@@ -377,7 +378,7 @@ void main() {
       await tester.dismissCellEditor();
 
       // Make sure the option is created and displayed in the cell
-      await tester.findSelectOptionWithNameInGrid(
+      tester.findSelectOptionWithNameInGrid(
         rowIndex: 0,
         name: tags.first,
       );
@@ -392,13 +393,13 @@ void main() {
       await tester.dismissCellEditor();
 
       for (final tag in tags) {
-        await tester.findSelectOptionWithNameInGrid(
+        tester.findSelectOptionWithNameInGrid(
           rowIndex: 0,
           name: tag,
         );
       }
 
-      await tester.assertNumberOfSelectedOptionsInGrid(
+      tester.assertNumberOfSelectedOptionsInGrid(
         rowIndex: 0,
         matcher: findsNWidgets(4),
       );
@@ -412,7 +413,7 @@ void main() {
       }
       await tester.dismissCellEditor();
 
-      await tester.assertNumberOfSelectedOptionsInGrid(
+      tester.assertNumberOfSelectedOptionsInGrid(
         rowIndex: 0,
         matcher: findsNothing,
       );
@@ -425,16 +426,16 @@ void main() {
       await tester.selectOption(name: tags[3]);
       await tester.dismissCellEditor();
 
-      await tester.findSelectOptionWithNameInGrid(
+      tester.findSelectOptionWithNameInGrid(
         rowIndex: 0,
         name: tags[1],
       );
-      await tester.findSelectOptionWithNameInGrid(
+      tester.findSelectOptionWithNameInGrid(
         rowIndex: 0,
         name: tags[3],
       );
 
-      await tester.assertNumberOfSelectedOptionsInGrid(
+      tester.assertNumberOfSelectedOptionsInGrid(
         rowIndex: 0,
         matcher: findsNWidgets(2),
       );
@@ -444,12 +445,12 @@ void main() {
 
     testWidgets('checklist', (tester) async {
       await tester.initializeAppFlowy();
-      await tester.tapGoButton();
+      await tester.tapAnonymousSignInButton();
 
       await tester.createNewPageWithNameUnderParent(layout: ViewLayoutPB.Grid);
 
       const fieldType = FieldType.Checklist;
-      await tester.createField(fieldType, fieldType.name);
+      await tester.createField(fieldType);
 
       // assert that there is no progress bar in the grid
       tester.assertChecklistCellInGrid(rowIndex: 0, percent: null);
@@ -461,22 +462,22 @@ void main() {
       tester.assertChecklistEditorVisible(visible: true);
 
       // create a new task with enter
-      await tester.createNewChecklistTask(name: "task 0", enter: true);
+      await tester.createNewChecklistTask(name: "task 1", enter: true);
 
       // assert that the task is displayed
       tester.assertChecklistTaskInEditor(
         index: 0,
-        name: "task 0",
+        name: "task 1",
         isChecked: false,
       );
 
       // update the task's name
-      await tester.renameChecklistTask(index: 0, name: "task 1");
+      await tester.renameChecklistTask(index: 0, name: "task 11");
 
       // assert that the task's name is updated
       tester.assertChecklistTaskInEditor(
         index: 0,
-        name: "task 1",
+        name: "task 11",
         isChecked: false,
       );
 

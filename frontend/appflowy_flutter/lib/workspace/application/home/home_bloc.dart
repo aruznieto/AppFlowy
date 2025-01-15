@@ -1,21 +1,22 @@
 import 'package:appflowy/user/application/user_listener.dart';
+import 'package:appflowy/workspace/application/view/view_ext.dart';
 import 'package:appflowy_backend/log.dart';
 import 'package:appflowy_backend/protobuf/flowy-folder/view.pb.dart';
 import 'package:appflowy_backend/protobuf/flowy-folder/workspace.pb.dart'
     show WorkspaceSettingPB;
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:flowy_infra/time/duration.dart';
 import 'package:freezed_annotation/freezed_annotation.dart';
+
 part 'home_bloc.freezed.dart';
 
 class HomeBloc extends Bloc<HomeEvent, HomeState> {
   HomeBloc(WorkspaceSettingPB workspaceSetting)
-      : _workspaceListener = UserWorkspaceListener(),
+      : _workspaceListener = FolderListener(),
         super(HomeState.initial(workspaceSetting)) {
     _dispatch(workspaceSetting);
   }
 
-  final UserWorkspaceListener _workspaceListener;
+  final FolderListener _workspaceListener;
 
   @override
   Future<void> close() async {
@@ -48,9 +49,16 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
             emit(state.copyWith(isLoading: e.isLoading));
           },
           didReceiveWorkspaceSetting: (_DidReceiveWorkspaceSetting value) {
+            // the latest view is shared across all the members of the workspace.
+
             final latestView = value.setting.hasLatestView()
                 ? value.setting.latestView
                 : state.latestView;
+
+            if (latestView != null && latestView.isSpace) {
+              // If the latest view is a space, we don't need to open it.
+              return;
+            }
 
             emit(
               state.copyWith(
@@ -62,22 +70,6 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
         );
       },
     );
-  }
-}
-
-enum MenuResizeType {
-  slide,
-  drag,
-}
-
-extension MenuResizeTypeExtension on MenuResizeType {
-  Duration duration() {
-    switch (this) {
-      case MenuResizeType.drag:
-        return 30.milliseconds;
-      case MenuResizeType.slide:
-        return 350.milliseconds;
-    }
   }
 }
 

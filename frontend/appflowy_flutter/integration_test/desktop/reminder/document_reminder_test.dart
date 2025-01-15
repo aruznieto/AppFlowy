@@ -15,7 +15,7 @@ import 'package:integration_test/integration_test.dart';
 
 import '../../shared/base.dart';
 import '../../shared/common_operations.dart';
-import '../../shared/editor_test_operations.dart';
+import '../../shared/document_test_operations.dart';
 import '../../shared/expectation.dart';
 import '../../shared/keyboard.dart';
 
@@ -27,7 +27,7 @@ void main() {
       const time = "23:59";
 
       await tester.initializeAppFlowy();
-      await tester.tapGoButton();
+      await tester.tapAnonymousSignInButton();
 
       final dateTimeSettings =
           await UserSettingsBackendService().getDateTimeSettings();
@@ -76,7 +76,7 @@ void main() {
     testWidgets('Add reminder for tomorrow, and navigate to it',
         (tester) async {
       await tester.initializeAppFlowy();
-      await tester.tapGoButton();
+      await tester.tapAnonymousSignInButton();
 
       await tester.editor.tapLineOfEditorAt(0);
       await tester.editor.getCurrentEditorState().insertNewLine();

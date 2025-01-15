@@ -9,6 +9,7 @@
   "title": "標題",
   "youCanAlso": "你也可以",
   "and": "和",
+  "failedToOpenUrl": "無法開啟網址：{}",
   "blockActions": {
     "addBelowTooltip": "點選以在下方新增",
     "addAboveCmd": "Alt+點選",
@@ -35,42 +36,92 @@
     "loginButtonText": "登入",
     "loginStartWithAnonymous": "以匿名身份開始",
     "continueAnonymousUser": "以匿名身份繼續",
+    "anonymous": "匿名的",
     "buttonText": "登入",
     "signingInText": "正在登入...",
     "forgotPassword": "忘記密碼？",
     "emailHint": "電子郵件",
     "passwordHint": "密碼",
     "dontHaveAnAccount": "還沒有帳號？",
+    "createAccount": "建立帳戶",
     "repeatPasswordEmptyError": "確認密碼不能為空",
     "unmatchedPasswordError": "密碼重複輸入不一致",
     "syncPromptMessage": "同步資料可能需要一些時間。請不要關閉此頁面",
     "or": "或",
+    "signInWithGoogle": "使用Google 登入",
+    "signInWithGithub": "使用Github 登入",
+    "signInWithDiscord": "使用Discord 登入",
+    "signInWithApple": "使用 Apple 帳號登入",
+    "continueAnotherWay": "使用其他方式登入",
+    "signUpWithGoogle": "使用Google 註冊",
+    "signUpWithGithub": "使用Github 註冊",
+    "signUpWithDiscord": "使用Discord 註冊",
+    "signInWith": "透過以下方式登入：",
+    "signInWithEmail": "使用電子郵件登入",
+    "signInWithMagicLink": "使用Magic Link 登入",
+    "signUpWithMagicLink": "使用Magic Link 註冊",
+    "pleaseInputYourEmail": "請輸入您的電郵地址",
+    "settings": "設定",
+    "magicLinkSent": "我們己發送Magic Link 到您的電子郵件，點擊連結登入",
+    "invalidEmail": "請輸入有效的電郵地址",
+    "alreadyHaveAnAccount": "已經有帳戶？",
+    "logIn": "登入",
+    "generalError": "出了些問題。請稍後再試",
+    "limitRateError": "出於安全原因，您只能每60 秒申請一次Magic Link",
+    "magicLinkSentDescription": "連結已發送到您的電子信箱。點擊連結即可登入。連結將在 5 分鐘後過期。",
     "LogInWithGoogle": "使用 Google 登入",
     "LogInWithGithub": "使用 Github 登入",
     "LogInWithDiscord": "使用 Discord 登入",
-    "signInWith": "透過以下方式登入："
+    "loginAsGuestButtonText": "以訪客身分登入"
   },
   "workspace": {
     "chooseWorkspace": "選擇你的工作區",
     "create": "建立工作區",
     "reset": "重設工作區",
+    "renameWorkspace": "重新命名工作區",
     "resetWorkspacePrompt": "重設工作區將刪除其中所有頁面和資料。你確定要重設工作區嗎？或者，你可以聯絡支援團隊來恢復工作區。",
     "hint": "工作區",
     "notFoundError": "找不到工作區",
-    "failedToLoad": "出了些問題！無法載入工作區。請嘗試關閉 AppFlowy 的任何開啟執行個體，然後再試一次。",
+    "failedToLoad": "出了些問題！無法載入工作區。請嘗試關閉 @:appName 的任何開啟執行個體，然後再試一次。",
     "errorActions": {
       "reportIssue": "回報問題",
       "reportIssueOnGithub": "在 Github 提交 issue",
       "exportLogFiles": "匯出日誌記錄檔案",
       "reachOut": "在 Discord 上聯絡我們"
-    }
+    },
+    "menuTitle": "工作區",
+    "deleteWorkspaceHintText": "您確定要刪除工作區嗎？此操作無法撤銷",
+    "createSuccess": "成功創建工作區",
+    "createFailed": "無法創建工作區",
+    "createLimitExceeded": "您已達到帳戶允許的最大工作區限制。如果您需要額外的工作空間，請在 Github 上申請",
+    "deleteSuccess": "工作區刪除成功",
+    "deleteFailed": "工作區刪除失敗",
+    "openSuccess": "成功開啟工作區",
+    "openFailed": "無法開啟工作區",
+    "renameSuccess": "工作區重命名成功",
+    "renameFailed": "無法重命名工作區",
+    "updateIconSuccess": "更新工作區圖標成功",
+    "updateIconFailed": "無法更新工作區圖標",
+    "cannotDeleteTheOnlyWorkspace": "無法刪除唯一的工作區",
+    "fetchWorkspacesFailed": "無法取得工作區",
+    "leaveCurrentWorkspace": "離開工作區",
+    "leaveCurrentWorkspacePrompt": "您確定要離開當前工作區嗎？"
   },
   "shareAction": {
     "buttonText": "分享",
     "workInProgress": "即將推出",
     "markdown": "Markdown",
+    "html": "HTML",
+    "clipboard": "複製到剪貼簿",
     "csv": "CSV",
-    "copyLink": "複製連結"
+    "copyLink": "複製連結",
+    "publishToTheWeb": "發佈到公開網路",
+    "publishToTheWebHint": "使用 AppFlowy 建立網站",
+    "publish": "發佈",
+    "unPublish": "取消發佈",
+    "exportAsTab": "導出為",
+    "publishTab": "發佈",
+    "shareTab": "分享"
   },
   "moreAction": {
     "small": "小",
@@ -78,7 +129,12 @@
     "large": "大",
     "fontSize": "字型大小",
     "import": "匯入",
-    "moreOptions": "更多選項"
+    "moreOptions": "更多選項",
+    "wordCount": "字數：{}",
+    "charCount": "字符數：{}",
+    "createdAt": "建立於：{}",
+    "deleteView": "刪除",
+    "duplicateView": "複製"
   },
   "importPanel": {
     "textAndMarkdown": "文字 & Markdown",
@@ -96,7 +152,9 @@
     "openNewTab": "在新分頁中開啟",
     "moveTo": "移動到",
     "addToFavorites": "加入最愛",
-    "copyLink": "複製連結"
+    "copyLink": "複製連結",
+    "changeIcon": "更改圖示",
+    "collapseAllPages": "折疊所有子頁面"
   },
   "blankPageTitle": "空白頁面",
   "newPageText": "新增頁面",
@@ -104,6 +162,25 @@
   "newGridText": "新增網格",
   "newCalendarText": "新增日曆",
   "newBoardText": "新增看板",
+  "chat": {
+    "newChat": "AI 聊天",
+    "inputMessageHint": "詢問 @:appName AI",
+    "inputLocalAIMessageHint": "詢問 @:appName 本機 AI",
+    "unsupportedCloudPrompt": "此功能僅在使用 @:appName Cloud 時可用",
+    "relatedQuestion": "相關問題",
+    "serverUnavailable": "服務暫時無法使用，請稍後再試。",
+    "aiServerUnavailable": "🌈 哎呀！ 🌈 我們的回覆被一隻獨角獸吃掉了！請重新試一次吧！ ",
+    "clickToRetry": "點擊重試",
+    "regenerateAnswer": "重新產生",
+    "question1": "如何使用 Kanban 來管理任務",
+    "question2": "解釋 GTD 工作法",
+    "question3": "為什麼要使用 Rust",
+    "question4": "清冰箱食譜",
+    "aiMistakePrompt": "AI 可能會犯錯，請檢查重要資訊。",
+    "clickToMention": "單擊以提及頁面",
+    "uploadFile": "上傳 PDF、md 或 txt 檔案以進行聊天",
+    "questionDetail": "{} 你好！我能為您提供什麼幫助？"
+  },
   "trash": {
     "text": "垃圾桶",
     "restoreAll": "全部還原",
@@ -127,7 +204,8 @@
       "emptyDescription": "您沒有任何已刪除的檔案",
       "isDeleted": "已刪除",
       "isRestored": "已還原"
-    }
+    },
+    "confirmDeleteTitle": "確定永久刪除此頁面"
   },
   "deletePagePrompt": {
     "text": "此頁面在垃圾桶中",
@@ -181,17 +259,48 @@
     "dragRow": "長按以重新排序列",
     "viewDataBase": "檢視資料庫",
     "referencePage": "這個 {name} 已被引用",
-    "addBlockBelow": "在下方新增一個區塊"
+    "addBlockBelow": "在下方新增一個區塊",
+    "aiGenerate": "產生",
+    "genSummary": "產成摘要"
   },
   "sideBar": {
     "closeSidebar": "關閉側欄",
     "openSidebar": "開啟側欄",
     "personal": "個人",
+    "private": "私人",
+    "workspace": "工作區",
     "favorites": "最愛",
+    "clickToHidePrivate": "點擊以隱藏私人空間\n您在此處建立的頁面只有您自己可見",
+    "clickToHideWorkspace": "點擊以隱藏工作區\n您在此處建立的頁面對每個成員都可見",
     "clickToHidePersonal": "點選以隱藏個人區塊",
     "clickToHideFavorites": "點選以隱藏最愛區塊",
     "addAPage": "新增頁面",
-    "recent": "最近"
+    "addAPageToPrivate": "新增頁面到私人空間",
+    "addAPageToWorkspace": "將頁面新增至工作區",
+    "recent": "最近",
+    "today": "今天",
+    "thisWeek": "本週",
+    "justNow": "剛才",
+    "minutesAgo": "{count} 分鐘前",
+    "lastViewed": "上次查看",
+    "favoriteAt": "已收藏",
+    "emptyRecent": "沒有最近的頁面",
+    "emptyFavorite": "沒有收藏的頁面",
+    "emptyFavoriteDescription": "將頁面標記為收藏 - 它們將列在此處以便您可以快速存取！",
+    "removePageFromRecent": "要從最近的頁面中刪除此頁面嗎？",
+    "removeSuccess": "刪除成功",
+    "favoriteSpace": "收藏",
+    "RecentSpace": "最近的",
+    "Spaces": "空間",
+    "upgradeToPro": "升級到 Pro",
+    "upgradeToAIMax": "解鎖無限 AI",
+    "storageLimitDialogTitle": "您的免費儲存空間已用完，升級以解鎖無限儲存空間",
+    "storageLimitDialogTitleIOS": "您的免費儲存空間已用完。",
+    "aiResponseLimitTitle": "您的免費 AI 回覆已用完，升級到 Pro 或購買 AI 附加方案以解鎖無限回覆",
+    "aiResponseLimitTitleIOS": "您的免費 AI 回覆已用完。",
+    "aiResponseLimitDialogTitle": "AI 回覆已達到限制",
+    "purchaseStorageSpace": "購買儲存空間",
+    "purchaseAIResponse": "購買"
   },
   "notifications": {
     "export": {
@@ -207,6 +316,7 @@
   },
   "button": {
     "ok": "確定",
+    "confirm": "確認",
     "done": "完成",
     "cancel": "取消",
     "signIn": "登入",
@@ -229,11 +339,35 @@
     "update": "更新",
     "share": "分享",
     "removeFromFavorites": "從最愛中移除",
+    "removeFromRecent": "從最近刪除",
     "addToFavorites": "加入最愛",
+    "favoriteSuccessfully": "收藏成功",
+    "duplicateSuccessfully": "複製成功",
     "rename": "重新命名",
     "helpCenter": "支援中心",
     "add": "新增",
-    "yes": "是"
+    "yes": "是",
+    "no": "否",
+    "clear": "清除",
+    "remove": "刪除",
+    "dontRemove": "不要刪除",
+    "copyLink": "複製連結",
+    "align": "對齊",
+    "login": "登入",
+    "logout": "登出",
+    "deleteAccount": "刪除帳號",
+    "back": "返回",
+    "signInGoogle": "使用Google 登入",
+    "signInGithub": "使用Github 登入",
+    "signInDiscord": "使用Discord 登入",
+    "more": "更多",
+    "create": "新增",
+    "close": "關閉",
+    "next": "下一個",
+    "previous": "上一個",
+    "download": "下載",
+    "backToHome": "回首頁",
+    "tryAGain": "再試一次"
   },
   "label": {
     "welcome": "歡迎！",
@@ -257,6 +391,31 @@
   },
   "settings": {
     "title": "設定",
+    "popupMenuItem": {
+      "settings": "設定",
+      "members": "成員",
+      "trash": "垃圾桶"
+    },
+    "accountPage": {
+      "menuLabel": "我的帳號",
+      "title": "我的帳號",
+      "general": {
+        "title": "帳號名稱和個人資料圖片",
+        "changeProfilePicture": "更改個人資料圖片"
+      },
+      "email": {
+        "title": "電子郵件",
+        "actions": {
+          "change": "更改電子郵件"
+        }
+      },
+      "login": {
+        "title": "帳號登入",
+        "loginLabel": "登入",
+        "logoutLabel": "登出"
+      },
+      "description": "自訂您的個人資料、管理帳戶安全性和 AI API 金鑰，或登入您的帳號"
+    },
     "menu": {
       "appearance": "外觀",
       "language": "語言",
@@ -276,13 +435,8 @@
       "cloudServerType": "雲端伺服器種類",
       "cloudServerTypeTip": "請注意，切換雲端伺服器後可能會登出您目前的帳號",
       "cloudLocal": "本地",
-      "cloudSupabase": "Supabase",
-      "cloudSupabaseUrl": "Supabase 網址",
-      "cloudSupabaseUrlCanNotBeEmpty": "Supabase 網址不能為空",
-      "cloudSupabaseAnonKey": "Supabase 匿名金鑰",
-      "cloudSupabaseAnonKeyCanNotBeEmpty": "如果 Supabase 網址不為空，則匿名金鑰不得為空",
-      "cloudAppFlowy": "AppFlowy 雲端測試版 (Beta)",
-      "cloudAppFlowySelfHost": "自架 AppFlowy 雲端伺服器",
+      "cloudAppFlowy": "@:appName 雲端測試版 (Beta)",
+      "cloudAppFlowySelfHost": "自架 @:appName 雲端伺服器",
       "appFlowyCloudUrlCanNotBeEmpty": "雲端網址不能為空",
       "clickToCopy": "點選以複製",
       "selfHostStart": "若您尚未設定伺服器，請參閱",
@@ -303,12 +457,12 @@
       "historicalUserList": "使用者登入歷史",
       "historicalUserListTooltip": "此列表顯示您的匿名帳號。您可以點選帳號以檢視其詳細資訊。透過點選「開始使用」按鈕來建立匿名帳號",
       "openHistoricalUser": "點選以開啟匿名帳號",
-      "customPathPrompt": "將 AppFlowy 資料資料夾儲存在如 Google 雲端硬碟等雲端同步資料夾中可能會帶來風險。如果該資料庫在多處同時被存取或修改，可能會導致同步衝突和潛在的資料損壞",
-      "importAppFlowyData": "從外部 AppFlowy 資料夾匯入資料",
+      "customPathPrompt": "將 @:appName 資料資料夾儲存在如 Google 雲端硬碟等雲端同步資料夾中可能會帶來風險。如果該資料庫在多處同時被存取或修改，可能會導致同步衝突和潛在的資料損壞",
+      "importAppFlowyData": "從外部 @:appName 資料夾匯入資料",
       "importingAppFlowyDataTip": "資料正在匯入中。請勿關閉應用程式",
-      "importAppFlowyDataDescription": "從外部 AppFlowy 資料夾複製資料並匯入到目前的 AppFlowy 資料夾",
-      "importSuccess": "成功匯入 AppFlowy 資料夾",
-      "importFailed": "匯入 AppFlowy 資料夾失敗",
+      "importAppFlowyDataDescription": "從外部 @:appName 資料夾複製資料並匯入到目前的 @:appName 資料夾",
+      "importSuccess": "成功匯入 @:appName 資料夾",
+      "importFailed": "匯入 @:appName 資料夾失敗",
       "importGuide": "欲瞭解更多詳細資訊，請查閱參考文件"
     },
     "notifications": {
@@ -321,7 +475,8 @@
       "resetSetting": "重設",
       "fontFamily": {
         "label": "字型",
-        "search": "搜尋"
+        "search": "搜尋",
+        "defaultFont": "系統預設"
       },
       "themeMode": {
         "label": "主題模式",
@@ -329,6 +484,7 @@
         "dark": "深色模式",
         "system": "依照系統設定"
       },
+      "fontScaleFactor": "字體比例",
       "documentSettings": {
         "cursorColor": "文件游標顏色",
         "selectionColor": "文件選取顏色",
@@ -358,7 +514,7 @@
       "themeUpload": {
         "button": "上傳",
         "uploadTheme": "上傳主題",
-        "description": "使用下方的按鈕上傳您自己的 AppFlowy 主題。",
+        "description": "使用下方的按鈕上傳您自己的 @:appName 主題。",
         "loading": "我們正在驗證並上傳您的主題，請稍候...",
         "uploadSuccess": "您的主題已成功上傳",
         "deletionFailure": "刪除主題失敗。請嘗試手動刪除。",
@@ -381,14 +537,38 @@
         "twelveHour": "12 小時制",
         "twentyFourHour": "24 小時制"
       },
-      "showNamingDialogWhenCreatingPage": "建立頁面時顯示命名對話框"
+      "showNamingDialogWhenCreatingPage": "建立頁面時顯示命名對話框",
+      "members": {
+        "title": "成員設定",
+        "inviteMembers": "邀請成員",
+        "sendInvite": "發送邀請",
+        "copyInviteLink": "複製邀請連結",
+        "label": "成員",
+        "user": "使用者",
+        "role": "身分組",
+        "removeFromWorkspace": "從工作區中刪除",
+        "owner": "擁有者",
+        "guest": "訪客",
+        "member": "成員",
+        "memberHintText": "成員可以閱讀、評論和編輯頁面。邀請其他成員和訪客",
+        "guestHintText": "訪客可以閱讀、做出回應、發表評論，並且可以在獲得許可的情況下編輯頁面",
+        "emailInvalidError": "電郵無效，請檢查並重試",
+        "emailSent": "郵件已發送，請查看您的收件匣",
+        "members": "成員",
+        "failedToAddMember": "新增成員失敗",
+        "addMemberSuccess": "成員新增成功",
+        "removeMember": "刪除成員",
+        "areYouSureToRemoveMember": "確定要刪除該成員?",
+        "inviteMemberSuccess": "邀請已成功發送",
+        "failedToInviteMember": "邀請成員失敗"
+      }
     },
     "files": {
       "copy": "複製",
-      "defaultLocation": "AppFlowy 資料儲存位置",
+      "defaultLocation": "@:appName 資料儲存位置",
       "exportData": "匯出您的資料",
       "doubleTapToCopy": "點選兩下以複製路徑",
-      "restoreLocation": "恢復為 AppFlowy 預設路徑",
+      "restoreLocation": "恢復為 @:appName 預設路徑",
       "customizeLocation": "開啟其他資料夾",
       "restartApp": "請重新啟動應用程式以使變更生效。",
       "exportDatabase": "匯出資料庫",
@@ -400,10 +580,10 @@
       "defineWhereYourDataIsStored": "定義您的資料儲存位置",
       "open": "開啟",
       "openFolder": "開啟一個已經存在的資料夾",
-      "openFolderDesc": "讀取並寫入到現有的 AppFlowy 資料夾",
+      "openFolderDesc": "讀取並寫入到現有的 @:appName 資料夾",
       "folderHintText": "資料夾名稱",
       "location": "建立新資料夾",
-      "locationDesc": "為您的 AppFlowy 資料夾選擇一個名稱",
+      "locationDesc": "為您的 @:appName 資料夾選擇一個名稱",
       "browser": "瀏覽",
       "create": "建立",
       "set": "設定",
@@ -414,30 +594,23 @@
       "change": "更改",
       "openLocationTooltips": "開啟另一個資料目錄",
       "openCurrentDataFolder": "開啟目前資料目錄",
-      "recoverLocationTooltips": "重設為 AppFlowy 的預設資料目錄",
+      "recoverLocationTooltips": "重設為 @:appName 的預設資料目錄",
       "exportFileSuccess": "匯出檔案成功！",
       "exportFileFail": "匯出檔案失敗！",
-      "export": "匯出"
+      "export": "匯出",
+      "clearCache": "清除快取",
+      "clearCacheDesc": "如果您遇到圖像無法載入或字體無法正確顯示等問題，請嘗試清除快取。此操作不會刪除您的使用者資料",
+      "areYouSureToClearCache": "確定清除快取?",
+      "clearCacheSuccess": "快取清除成功"
     },
     "user": {
       "name": "名稱",
       "email": "電子郵件",
       "tooltipSelectIcon": "選擇圖示",
       "selectAnIcon": "選擇圖示",
-      "pleaseInputYourOpenAIKey": "請輸入您的 OpenAI 金鑰",
-      "pleaseInputYourStabilityAIKey": "請輸入您的 Stability AI 金鑰",
-      "clickToLogout": "點選以登出目前使用者"
-    },
-    "shortcuts": {
-      "shortcutsLabel": "快捷鍵",
-      "command": "指令",
-      "keyBinding": "鍵盤綁定",
-      "addNewCommand": "新增指令",
-      "updateShortcutStep": "按下您想要的鍵盤組合並按下 ENTER",
-      "shortcutIsAlreadyUsed": "此快捷鍵已被使用於：{conflict}",
-      "resetToDefault": "重設為預設鍵盤綁定",
-      "couldNotLoadErrorMsg": "無法載入快捷鍵，請再試一次",
-      "couldNotSaveErrorMsg": "無法儲存快捷鍵，請再試一次"
+      "pleaseInputYourOpenAIKey": "請輸入您的 AI 金鑰",
+      "clickToLogout": "點選以登出目前使用者",
+      "pleaseInputYourStabilityAIKey": "請輸入您的 Stability AI 金鑰"
     },
     "mobile": {
       "personalInfo": "個人資料",
@@ -455,6 +628,20 @@
       "selectLayout": "選擇版面配置",
       "selectStartingDay": "選擇一週的起始日",
       "version": "版本"
+    },
+    "shortcuts": {
+      "shortcutsLabel": "快捷鍵",
+      "command": "指令",
+      "keyBinding": "鍵盤綁定",
+      "addNewCommand": "新增指令",
+      "updateShortcutStep": "按下您想要的鍵盤組合並按下 ENTER",
+      "shortcutIsAlreadyUsed": "此快捷鍵已被使用於：{conflict}",
+      "resetToDefault": "重設為預設鍵盤綁定",
+      "couldNotLoadErrorMsg": "無法載入快捷鍵，請再試一次",
+      "couldNotSaveErrorMsg": "無法儲存快捷鍵，請再試一次",
+      "commands": {
+        "textAlignRight": "向右對齊文字"
+      }
     }
   },
   "grid": {
@@ -548,6 +735,7 @@
       "multiSelectFieldName": "多選",
       "urlFieldName": "網址",
       "checklistFieldName": "核取清單",
+      "summaryFieldName": "AI 總結",
       "numberFormat": "數字格式",
       "dateFormat": "日期格式",
       "includeTime": "包含時間",
@@ -577,9 +765,11 @@
       "editProperty": "編輯屬性",
       "newProperty": "新增屬性",
       "deleteFieldPromptMessage": "您確定嗎？這個屬性將被刪除",
+      "clearFieldPromptMessage": "確定操作，該列中的所有單元格都將被清空",
       "newColumn": "新增欄位",
       "format": "格式",
-      "reminderOnDateTooltip": "此欄位設有預定提醒"
+      "reminderOnDateTooltip": "此欄位設有預定提醒",
+      "optionAlreadyExist": "選項已存在"
     },
     "rowPage": {
       "newField": "新增欄位",
@@ -593,7 +783,8 @@
         "one": "隱藏 {count} 個隱藏欄位",
         "many": "隱藏 {count} 個隱藏欄位",
         "other": "隱藏 {count} 個隱藏欄位"
-      }
+      },
+      "openAsFullPage": "以整頁形式打開"
     },
     "sort": {
       "ascending": "升冪",
@@ -614,7 +805,8 @@
       "drag": "拖曳以移動",
       "dragAndClick": "拖曳以移動，點選以開啟選單",
       "insertRecordAbove": "在上方插入記錄",
-      "insertRecordBelow": "在下方插入記錄"
+      "insertRecordBelow": "在下方插入記錄",
+      "noContent": "無內容"
     },
     "selectOption": {
       "create": "建立",
@@ -646,7 +838,9 @@
     },
     "url": {
       "launch": "在瀏覽器中開啟",
-      "copy": "複製網址"
+      "copy": "複製網址",
+      "textFieldHint": "輸入網址",
+      "copiedNotification": "已複製到剪貼簿"
     },
     "menuName": "網格",
     "referencedGridPrefix": "檢視",
@@ -692,26 +886,28 @@
       "referencedGrid": "已連結的網格",
       "referencedCalendar": "已連結的日曆",
       "referencedDocument": "已連結的文件",
-      "autoGeneratorMenuItemName": "OpenAI 寫手",
-      "autoGeneratorTitleName": "OpenAI：讓 AI 撰寫任何內容……",
+      "autoGeneratorMenuItemName": "AI 寫手",
+      "autoGeneratorTitleName": "AI：讓 AI 撰寫任何內容……",
       "autoGeneratorLearnMore": "瞭解更多",
       "autoGeneratorGenerate": "產生",
-      "autoGeneratorHintText": "問 OpenAI……",
-      "autoGeneratorCantGetOpenAIKey": "無法取得 OpenAI 金鑰",
+      "autoGeneratorHintText": "問 AI……",
+      "autoGeneratorCantGetOpenAIKey": "無法取得 AI 金鑰",
       "autoGeneratorRewrite": "改寫",
       "smartEdit": "AI 助理",
-      "openAI": "OpenAI",
+      "aI": "AI",
       "smartEditFixSpelling": "修正拼寫",
       "warning": "⚠️ AI 的回覆可能不準確或具有誤導性。",
       "smartEditSummarize": "總結",
       "smartEditImproveWriting": "提高寫作水準",
       "smartEditMakeLonger": "做得更長",
-      "smartEditCouldNotFetchResult": "無法取得 OpenAI 的結果",
-      "smartEditCouldNotFetchKey": "無法取得 OpenAI 金鑰",
-      "smartEditDisabled": "在設定連結 OpenAI ",
+      "smartEditCouldNotFetchResult": "無法取得 AI 的結果",
+      "smartEditCouldNotFetchKey": "無法取得 AI 金鑰",
+      "smartEditDisabled": "在設定連結 AI ",
       "discardResponse": "確定捨棄 AI 的回覆？",
       "createInlineMathEquation": "建立公式",
       "fonts": "字型",
+      "insertDate": "插入日期",
+      "emoji": "表情符號",
       "toggleList": "切換列表",
       "quoteList": "引述列表",
       "numberedList": "編號列表",
@@ -764,14 +960,18 @@
         "defaultColor": "預設"
       },
       "image": {
+        "addAnImage": "新增圖片",
         "copiedToPasteBoard": "圖片連結已複製到剪貼簿",
-        "addAnImage": "新增圖片"
+        "imageUploadFailed": "圖片上傳失敗",
+        "errorCode": "錯誤代碼"
       },
       "urlPreview": {
-        "copiedToPasteBoard": "連結已複製到剪貼簿"
+        "copiedToPasteBoard": "連結已複製到剪貼簿",
+        "convertToLink": "轉換為嵌入鏈接"
       },
       "outline": {
-        "addHeadingToCreateOutline": "新增標題以建立目錄。"
+        "addHeadingToCreateOutline": "新增標題以建立目錄。",
+        "noMatchHeadings": "未找到匹配的標題"
       },
       "table": {
         "addAfter": "在後方新增",
@@ -795,8 +995,10 @@
         "newDatabase": "新建資料庫",
         "linkToDatabase": "連結至資料庫"
       },
-      "date": "日期",
-      "emoji": "表情符號"
+      "date": "日期"
+    },
+    "outlineBlock": {
+      "placeholder": "目錄"
     },
     "textBlock": {
       "placeholder": "輸入“/”作為命令"
@@ -815,8 +1017,8 @@
         "placeholder": "輸入圖片網址"
       },
       "ai": {
-        "label": "由 OpenAI 生成圖片",
-        "placeholder": "請輸入提示讓 OpenAI 生成圖片"
+        "label": "由 AI 生成圖片",
+        "placeholder": "請輸入提示讓 AI 生成圖片"
       },
       "stability_ai": {
         "label": "由 Stability AI 生成圖片",
@@ -827,7 +1029,8 @@
         "invalidImage": "無效的圖片",
         "invalidImageSize": "圖片大小必須小於 5MB",
         "invalidImageFormat": "不支援的圖片格式。支援的格式：JPEG、PNG、GIF、SVG",
-        "invalidImageUrl": "無效的圖片網址"
+        "invalidImageUrl": "無效的圖片網址",
+        "noImage": "沒有該檔案或目錄"
       },
       "embedLink": {
         "label": "嵌入連結",
@@ -837,20 +1040,25 @@
         "label": "Unsplash"
       },
       "searchForAnImage": "搜尋圖片",
-      "pleaseInputYourOpenAIKey": "請在設定頁面輸入您的 OpenAI 金鑰",
-      "pleaseInputYourStabilityAIKey": "請在設定頁面輸入您的 Stability AI 金鑰",
+      "pleaseInputYourOpenAIKey": "請在設定頁面輸入您的 AI 金鑰",
       "saveImageToGallery": "儲存圖片",
       "failedToAddImageToGallery": "無法將圖片新增到相簿",
       "successToAddImageToGallery": "圖片已成功新增到相簿",
       "unableToLoadImage": "無法載入圖片",
       "maximumImageSize": "支援的最大上傳圖片大小為 10MB",
-      "uploadImageErrorImageSizeTooBig": "圖片大小必須小於 10MB"
+      "uploadImageErrorImageSizeTooBig": "圖片大小必須小於 10MB",
+      "imageIsUploading": "圖片上傳中",
+      "pleaseInputYourStabilityAIKey": "請在設定頁面輸入您的 Stability AI 金鑰"
     },
     "codeBlock": {
       "language": {
         "label": "語言",
-        "placeholder": "選擇語言"
-      }
+        "placeholder": "選擇語言",
+        "auto": "自動"
+      },
+      "copyTooltip": "複製區塊的內容",
+      "searchLanguageHint": "搜尋語言",
+      "codeCopiedSnackbar": "程式碼已複製到剪貼簿"
     },
     "inlineLink": {
       "placeholder": "貼上或輸入連結",
@@ -881,6 +1089,11 @@
     "errorBlock": {
       "theBlockIsNotSupported": "目前版本不支援此區塊。",
       "blockContentHasBeenCopied": "區塊內容已被複製。"
+    },
+    "mobilePageSelector": {
+      "title": "選擇頁面",
+      "failedToLoad": "載入頁面清單失敗",
+      "noPagesFound": "沒有找到該頁面"
     }
   },
   "board": {
@@ -919,9 +1132,9 @@
     "notesTooltip": "內部備註",
     "mobile": {
       "editURL": "編輯網址",
-      "unhideGroup": "取消隱藏群組",
-      "unhideGroupContent": "您確定要在看板上顯示此群組嗎？",
-      "faildToLoad": "無法載入看板"
+      "showGroup": "取消隱藏群組",
+      "showGroupContent": "您確定要在看板上顯示此群組嗎？",
+      "failedToLoad": "無法載入看板"
     }
   },
   "calendar": {
@@ -958,7 +1171,7 @@
     "quickJumpYear": "跳到"
   },
   "errorDialog": {
-    "title": "AppFlowy 錯誤",
+    "title": "@:appName 錯誤",
     "howToFixFallback": "對於給您帶來的不便，我們深表歉意！在我們的 GitHub 頁面上提交描述您的錯誤的問題。",
     "github": "在 GitHub 上檢視"
   },
@@ -1025,6 +1238,7 @@
   },
   "inlineActions": {
     "noResults": "無結果",
+    "recentPages": "最近的頁面",
     "pageReference": "頁面參照",
     "docReference": "文件參照",
     "boardReference": "看板參照",
@@ -1106,7 +1320,8 @@
     "replace": "取代",
     "replaceAll": "全部取代",
     "noResult": "無結果",
-    "caseSensitive": "區分大小寫"
+    "caseSensitive": "區分大小寫",
+    "searchMore": "搜尋以查找更多結果"
   },
   "error": {
     "weAreSorry": "我們很抱歉",
@@ -1125,6 +1340,7 @@
     "color": "顏色",
     "image": "圖片",
     "date": "日期",
+    "page": "頁面",
     "italic": "斜體",
     "link": "連結",
     "numberedList": "編號清單",
@@ -1200,6 +1416,8 @@
     "copy": "複製",
     "paste": "貼上",
     "find": "尋找",
+    "select": "選取",
+    "selectAll": "選取所有",
     "previousMatch": "上一個符合",
     "nextMatch": "下一個符合",
     "closeFind": "關閉",
@@ -1256,5 +1474,75 @@
     "addField": "新增欄位",
     "userIcon": "使用者圖示"
   },
-  "noLogFiles": "這裡沒有日誌記錄檔案"
+  "noLogFiles": "這裡沒有日誌記錄檔案",
+  "newSettings": {
+    "myAccount": {
+      "title": "我的帳戶",
+      "subtitle": "自訂您的個人資料、管理帳戶安全性、Open AI 金鑰或登入您的帳戶",
+      "profileLabel": "帳號名稱和個人資料圖片",
+      "profileNamePlaceholder": "輸入你的名字",
+      "accountSecurity": "帳戶安全性",
+      "2FA": "兩步驟驗證",
+      "accountLogin": "帳號登入",
+      "updateNameError": "名稱更新失敗",
+      "updateIconError": "個人頭像更新失敗",
+      "deleteAccount": {
+        "title": "刪除帳號",
+        "subtitle": "永久刪除您的帳號和所有資料",
+        "deleteMyAccount": "刪除我的帳號",
+        "dialogTitle": "刪除帳號",
+        "dialogContent1": "確定要永久刪除您的帳號",
+        "dialogContent2": "此操作無法撤銷，此操作將刪除所有團隊空間的存取權限，刪除您的整個帳戶（包括私人工作區），並將您從所有共用工作區中刪除"
+      }
+    },
+    "workplace": {
+      "name": "工作區",
+      "title": "工作區設定",
+      "subtitle": "自訂您的工作區外觀、主題、字體、文字佈局、日期、時間和語言",
+      "workplaceName": "工作區名稱",
+      "workplaceNamePlaceholder": "輸入工作區名稱",
+      "workplaceIcon": "工作區圖標",
+      "workplaceIconSubtitle": "為您的工作區上傳圖像或表情符號。圖示將顯示在您的側邊欄和通知中",
+      "renameError": "工作區重新命名失敗",
+      "updateIconError": "更新圖像失敗",
+      "appearance": {
+        "name": "外觀",
+        "themeMode": {
+          "auto": "自動",
+          "light": "亮白",
+          "dark": "黑暗"
+        },
+        "language": "語言"
+      }
+    },
+    "syncState": {
+      "syncing": "同步中",
+      "synced": "已同步",
+      "noNetworkConnected": "沒有連線網絡"
+    }
+  },
+  "pageStyle": {
+    "title": "頁面樣式",
+    "layout": "佈局",
+    "coverImage": "封面圖片",
+    "pageIcon": "頁面圖片",
+    "colors": "顏色",
+    "gradient": "漸變",
+    "backgroundImage": "背景圖片",
+    "presets": "預設",
+    "photo": "圖片",
+    "pageCover": "封面",
+    "none": "無",
+    "openSettings": "打開設定",
+    "photoPermissionTitle": "@:appName 希望存取您的圖片庫",
+    "photoPermissionDescription": "允許存取圖片庫以上傳圖片",
+    "doNotAllow": "不允許"
+  },
+  "commandPalette": {
+    "bestMatches": "最佳匹配",
+    "recentHistory": "最近歷史",
+    "loadingTooltip": "我們正在尋找結果...",
+    "betaLabel": "BETA",
+    "betaTooltip": "目前我們只支援搜尋頁面"
+  }
 }

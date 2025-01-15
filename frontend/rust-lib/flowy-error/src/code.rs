@@ -257,8 +257,108 @@ pub enum ErrorCode {
   #[error("AppFlowy data folder import error")]
   AppFlowyDataFolderImportError = 89,
 
-  #[error("Cloud request payload too large")]
-  CloudRequestPayloadTooLarge = 90,
+  #[error("payload too large")]
+  PayloadTooLarge = 90,
+
+  #[error("Workspace limit exceeded")]
+  WorkspaceLimitExceeded = 91,
+
+  #[error("Workspace member limit exceeded")]
+  WorkspaceMemberLimitExceeded = 92,
+
+  #[error("IndexWriter failed to commit")]
+  IndexWriterFailedCommit = 93,
+
+  #[error("Failed to open Index directory")]
+  FailedToOpenIndexDir = 94,
+
+  #[error("Failed to parse query")]
+  FailedToParseQuery = 95,
+
+  #[error("FolderIndexManager or its dependencies are unavailable")]
+  FolderIndexManagerUnavailable = 96,
+
+  #[error("Workspace data not match")]
+  WorkspaceDataNotMatch = 97,
+
+  #[error("Local AI error")]
+  LocalAIError = 98,
+
+  #[error("Local AI unavailable")]
+  LocalAIUnavailable = 99,
+
+  #[error("Storage limit exceeded")]
+  FileStorageLimitExceeded = 100,
+
+  #[error("AI Response limit exceeded")]
+  AIResponseLimitExceeded = 101,
+
+  #[error("Duplicate record")]
+  DuplicateSqliteRecord = 102,
+
+  #[error("Response timeout")]
+  ResponseTimeout = 103,
+
+  #[error("Unsupported file format")]
+  UnsupportedFileFormat = 104,
+
+  #[error("AI offline not started")]
+  AIOfflineNotInstalled = 105,
+
+  #[error("Invalid Request")]
+  InvalidRequest = 106,
+
+  #[error("In progress")]
+  // when client receives InProgress, it should retry
+  InProgress = 107,
+
+  #[error("Upload part size exceeds the limit")]
+  SingleUploadLimitExceeded = 108,
+
+  #[error("Group name is empty")]
+  GroupNameIsEmpty = 109,
+
+  #[error("Not available for current workspace plan")]
+  LimitedByWorkspacePlan = 110,
+
+  #[error("Invalid namespace")]
+  InvalidNamespace = 111,
+
+  #[error("Invalid publish name")]
+  InvalidPublishName = 112,
+
+  #[error("Custom namespace requires Pro Plan upgrade")]
+  CustomNamespaceRequirePlanUpgrade = 113,
+
+  #[error("Requested namespace is not allowed")]
+  CustomNamespaceNotAllowed = 114,
+
+  #[error("Requested namespace is already taken")]
+  CustomNamespaceAlreadyTaken = 115,
+
+  #[error("Requested namespace is too short")]
+  CustomNamespaceTooShort = 116,
+
+  #[error("Requested namespace is too long")]
+  CustomNamespaceTooLong = 117,
+
+  #[error("Requested namespace is reserved")]
+  CustomNamespaceReserved = 118,
+
+  #[error("Publish name is already used for another published view")]
+  PublishNameAlreadyExists = 119,
+
+  #[error("Publish name contains one or more invalid characters")]
+  PublishNameInvalidCharacter = 120,
+
+  #[error("Publish name has exceeded the maximum length allowable")]
+  PublishNameTooLong = 121,
+
+  #[error("Requested namespace has one or more invalid characters")]
+  CustomNamespaceInvalidCharacter = 122,
+
+  #[error("Requested namespace has one or more invalid characters")]
+  AIServiceUnavailable = 123,
 }
 
 impl ErrorCode {

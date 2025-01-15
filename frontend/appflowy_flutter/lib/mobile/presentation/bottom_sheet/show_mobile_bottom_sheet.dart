@@ -1,6 +1,6 @@
-import 'package:appflowy/mobile/presentation/base/app_bar_actions.dart';
+import 'package:appflowy/mobile/presentation/bottom_sheet/bottom_sheet_buttons.dart';
 import 'package:appflowy/plugins/base/drag_handler.dart';
-import 'package:flowy_infra_ui/flowy_infra_ui.dart' hide WidgetBuilder;
+import 'package:flowy_infra_ui/flowy_infra_ui.dart';
 import 'package:flutter/material.dart';
 
 extension BottomSheetPaddingExtension on BuildContext {
@@ -32,6 +32,8 @@ Future<T?> showMobileBottomSheet<T>(
   // this field is only used if showHeader is true
   bool showBackButton = false,
   bool showCloseButton = false,
+  bool showRemoveButton = false,
+  VoidCallback? onRemove,
   // this field is only used if showHeader is true
   String title = '',
   bool isScrollControlled = true,
@@ -45,11 +47,17 @@ Future<T?> showMobileBottomSheet<T>(
   Color? barrierColor,
   double? elevation,
   bool showDoneButton = false,
+  void Function(BuildContext context)? onDone,
   bool enableDraggableScrollable = false,
+  bool enableScrollable = false,
+  // this field is only used if showDragHandle is true
+  Widget Function(BuildContext, ScrollController)? scrollableWidgetBuilder,
   // only used when enableDraggableScrollable is true
   double minChildSize = 0.5,
   double maxChildSize = 0.8,
   double initialChildSize = 0.51,
+  double bottomSheetPadding = 0,
+  bool enablePadding = true,
 }) async {
   assert(
     showHeader ||
@@ -66,6 +74,7 @@ Future<T?> showMobileBottomSheet<T>(
   backgroundColor ??= Theme.of(context).brightness == Brightness.light
       ? const Color(0xFFF7F8FB)
       : const Color(0xFF23262B);
+  barrierColor ??= Colors.black.withOpacity(0.3);
 
   return showModalBottomSheet<T>(
     context: context,
@@ -102,7 +111,10 @@ Future<T?> showMobileBottomSheet<T>(
             showCloseButton: showCloseButton,
             showBackButton: showBackButton,
             showDoneButton: showDoneButton,
+            showRemoveButton: showRemoveButton,
             title: title,
+            onRemove: onRemove,
+            onDone: onDone,
           ),
         );
 
@@ -116,39 +128,63 @@ Future<T?> showMobileBottomSheet<T>(
       // ----- header area -----
 
       if (enableDraggableScrollable) {
+        final keyboardSize =
+            context.bottomSheetPadding() / MediaQuery.of(context).size.height;
         return DraggableScrollableSheet(
           expand: false,
           snap: true,
-          initialChildSize: initialChildSize,
-          minChildSize: minChildSize,
-          maxChildSize: maxChildSize,
+          initialChildSize: (initialChildSize + keyboardSize).clamp(0, 1),
+          minChildSize: (minChildSize + keyboardSize).clamp(0, 1.0),
+          maxChildSize: (maxChildSize + keyboardSize).clamp(0, 1.0),
           builder: (context, scrollController) {
             return Column(
               children: [
                 ...children,
-                Expanded(
-                  child: Scrollbar(
-                    child: SingleChildScrollView(
-                      controller: scrollController,
-                      child: child,
+                scrollableWidgetBuilder?.call(
+                      context,
+                      scrollController,
+                    ) ??
+                    Expanded(
+                      child: Scrollbar(
+                        controller: scrollController,
+                        child: SingleChildScrollView(
+                          controller: scrollController,
+                          child: child,
+                        ),
+                      ),
                     ),
-                  ),
-                ),
               ],
             );
           },
         );
+      } else if (enableScrollable) {
+        return Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ...children,
+            Flexible(
+              child: SingleChildScrollView(
+                child: child,
+              ),
+            ),
+            VSpace(bottomSheetPadding),
+          ],
+        );
       }
 
       // ----- content area -----
-      // add content padding and extra bottom padding
-      children.add(
-        Padding(
-          padding:
-              padding + EdgeInsets.only(bottom: context.bottomSheetPadding()),
-          child: child,
-        ),
-      );
+      if (enablePadding) {
+        // add content padding and extra bottom padding
+        children.add(
+          Padding(
+            padding:
+                padding + EdgeInsets.only(bottom: context.bottomSheetPadding()),
+            child: child,
+          ),
+        );
+      } else {
+        children.add(child);
+      }
       // ----- content area -----
 
       if (children.length == 1) {
@@ -175,14 +211,27 @@ class BottomSheetHeader extends StatelessWidget {
     super.key,
     required this.showBackButton,
     required this.showCloseButton,
+    required this.showRemoveButton,
     required this.title,
     required this.showDoneButton,
+    this.onRemove,
+    this.onDone,
+    this.onBack,
+    this.onClose,
   });
+
+  final String title;
 
   final bool showBackButton;
   final bool showCloseButton;
-  final String title;
+  final bool showRemoveButton;
   final bool showDoneButton;
+
+  final VoidCallback? onRemove;
+  final VoidCallback? onBack;
+  final VoidCallback? onClose;
+
+  final void Function(BuildContext context)? onDone;
 
   @override
   Widget build(BuildContext context) {
@@ -193,27 +242,48 @@ class BottomSheetHeader extends StatelessWidget {
         child: Stack(
           children: [
             if (showBackButton)
-              const Align(
+              Align(
                 alignment: Alignment.centerLeft,
-                child: AppBarBackButton(),
+                child: BottomSheetBackButton(
+                  onTap: onBack,
+                ),
               ),
             if (showCloseButton)
-              const Align(
+              Align(
                 alignment: Alignment.centerLeft,
-                child: AppBarCloseButton(),
+                child: BottomSheetCloseButton(
+                  onTap: onClose,
+                ),
+              ),
+            if (showRemoveButton)
+              Align(
+                alignment: Alignment.centerLeft,
+                child: BottomSheetRemoveButton(
+                  onRemove: () => onRemove?.call(),
+                ),
               ),
             Align(
-              child: FlowyText(
-                title,
-                fontSize: 16.0,
-                fontWeight: FontWeight.w500,
+              child: Container(
+                constraints: const BoxConstraints(maxWidth: 250),
+                child: FlowyText(
+                  title,
+                  fontSize: 17.0,
+                  fontWeight: FontWeight.w500,
+                  overflow: TextOverflow.ellipsis,
+                ),
               ),
             ),
             if (showDoneButton)
               Align(
                 alignment: Alignment.centerRight,
-                child: AppBarDoneButton(
-                  onTap: () => Navigator.pop(context),
+                child: BottomSheetDoneButton(
+                  onDone: () {
+                    if (onDone != null) {
+                      onDone?.call(context);
+                    } else {
+                      Navigator.pop(context);
+                    }
+                  },
                 ),
               ),
           ],

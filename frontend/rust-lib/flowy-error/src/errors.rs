@@ -1,7 +1,7 @@
-use std::convert::TryInto;
-use std::fmt::Debug;
-
+use collab::error::CollabError;
 use protobuf::ProtobufError;
+use std::convert::TryInto;
+use std::fmt::{Debug, Display};
 use thiserror::Error;
 use tokio::task::JoinError;
 use validator::{ValidationError, ValidationErrors};
@@ -13,7 +13,7 @@ use crate::code::ErrorCode;
 pub type FlowyResult<T> = anyhow::Result<T, FlowyError>;
 
 #[derive(Debug, Default, Clone, ProtoBuf, Error)]
-#[error("{code:?}: {msg}")]
+#[error("{msg}")]
 pub struct FlowyError {
   #[pb(index = 1)]
   pub code: ErrorCode,
@@ -42,8 +42,8 @@ impl FlowyError {
       payload: vec![],
     }
   }
-  pub fn with_context<T: Debug>(mut self, error: T) -> Self {
-    self.msg = format!("{:?}", error);
+  pub fn with_context<T: Display>(mut self, error: T) -> Self {
+    self.msg = format!("{}", error);
     self
   }
 
@@ -70,6 +70,25 @@ impl FlowyError {
 
   pub fn is_local_version_not_support(&self) -> bool {
     self.code == ErrorCode::LocalVersionNotSupport
+  }
+
+  pub fn is_file_limit_exceeded(&self) -> bool {
+    self.code == ErrorCode::FileStorageLimitExceeded
+  }
+
+  pub fn is_single_file_limit_exceeded(&self) -> bool {
+    self.code == ErrorCode::SingleUploadLimitExceeded
+  }
+
+  pub fn should_retry_upload(&self) -> bool {
+    !matches!(
+      self.code,
+      ErrorCode::FileStorageLimitExceeded | ErrorCode::SingleUploadLimitExceeded
+    )
+  }
+
+  pub fn is_ai_response_limit_exceeded(&self) -> bool {
+    self.code == ErrorCode::AIResponseLimitExceeded
   }
 
   static_flowy_error!(internal, ErrorCode::Internal);
@@ -113,6 +132,15 @@ impl FlowyError {
   static_flowy_error!(server_error, ErrorCode::InternalServerError);
   static_flowy_error!(not_support, ErrorCode::NotSupportYet);
   static_flowy_error!(local_version_not_support, ErrorCode::LocalVersionNotSupport);
+  static_flowy_error!(
+    folder_index_manager_unavailable,
+    ErrorCode::FolderIndexManagerUnavailable
+  );
+  static_flowy_error!(workspace_data_not_match, ErrorCode::WorkspaceDataNotMatch);
+  static_flowy_error!(local_ai, ErrorCode::LocalAIError);
+  static_flowy_error!(local_ai_unavailable, ErrorCode::LocalAIUnavailable);
+  static_flowy_error!(response_timeout, ErrorCode::ResponseTimeout);
+  static_flowy_error!(file_storage_limit, ErrorCode::FileStorageLimitExceeded);
 }
 
 impl std::convert::From<ErrorCode> for FlowyError {
@@ -130,7 +158,7 @@ pub fn internal_error<T>(e: T) -> FlowyError
 where
   T: std::fmt::Debug,
 {
-  FlowyError::internal().with_context(e)
+  FlowyError::internal().with_context(format!("{:?}", e))
 }
 
 impl std::convert::From<std::io::Error> for FlowyError {
@@ -179,5 +207,32 @@ impl From<JoinError> for FlowyError {
 impl From<tokio::sync::oneshot::error::RecvError> for FlowyError {
   fn from(e: tokio::sync::oneshot::error::RecvError) -> Self {
     FlowyError::internal().with_context(e)
+  }
+}
+
+impl From<String> for FlowyError {
+  fn from(e: String) -> Self {
+    FlowyError::internal().with_context(e)
+  }
+}
+
+impl From<collab::error::CollabError> for FlowyError {
+  fn from(value: CollabError) -> Self {
+    match value {
+      CollabError::SerdeJson(err) => FlowyError::serde().with_context(err),
+      CollabError::UnexpectedEmpty(err) => FlowyError::payload_none().with_context(err),
+      CollabError::AcquiredWriteTxnFail => FlowyError::internal(),
+      CollabError::AcquiredReadTxnFail => FlowyError::internal(),
+      CollabError::YrsTransactionError(err) => FlowyError::internal().with_context(err),
+      CollabError::YrsEncodeStateError(err) => FlowyError::internal().with_context(err),
+      CollabError::UndoManagerNotEnabled => {
+        FlowyError::not_support().with_context("UndoManager is not enabled")
+      },
+      CollabError::DecodeUpdate(err) => FlowyError::internal().with_context(err),
+      CollabError::NoRequiredData(err) => FlowyError::internal().with_context(err),
+      CollabError::Awareness(err) => FlowyError::internal().with_context(err),
+      CollabError::UpdateFailed(err) => FlowyError::internal().with_context(err),
+      CollabError::Internal(err) => FlowyError::internal().with_context(err),
+    }
   }
 }

@@ -15,7 +15,6 @@ void main() {
   test('create build-in kanban board test', () async {
     final context = await boardTest.createTestBoard();
     final boardBloc = BoardBloc(
-      view: context.gridView,
       databaseController: DatabaseController(view: context.gridView),
     )..add(const BoardEvent.initial());
     await boardResponseFuture();
@@ -27,7 +26,6 @@ void main() {
   test('edit kanban board field name test', () async {
     final context = await boardTest.createTestBoard();
     final boardBloc = BoardBloc(
-      view: context.gridView,
       databaseController: DatabaseController(view: context.gridView),
     )..add(const BoardEvent.initial());
     await boardResponseFuture();
@@ -36,9 +34,10 @@ void main() {
 
     final editorBloc = FieldEditorBloc(
       viewId: context.gridView.id,
-      field: fieldInfo.field,
+      fieldInfo: fieldInfo,
       fieldController: context.fieldController,
-    )..add(const FieldEditorEvent.initial());
+      isNew: false,
+    );
     await boardResponseFuture();
 
     editorBloc.add(const FieldEditorEvent.renameField('Hello world'));
@@ -59,7 +58,6 @@ void main() {
   test('create a new field in kanban board test', () async {
     final context = await boardTest.createTestBoard();
     final boardBloc = BoardBloc(
-      view: context.gridView,
       databaseController: DatabaseController(view: context.gridView),
     )..add(const BoardEvent.initial());
     await boardResponseFuture();

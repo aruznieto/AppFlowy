@@ -22,25 +22,28 @@ class TrashTestContext {
       const ViewEvent.createView(
         "Document 1",
         ViewLayoutPB.Document,
+        section: ViewSectionPB.Public,
       ),
     );
-    await blocResponseFuture();
+    await blocResponseFuture(millisecond: 300);
 
     viewBloc.add(
       const ViewEvent.createView(
         "Document 2",
         ViewLayoutPB.Document,
+        section: ViewSectionPB.Public,
       ),
     );
-    await blocResponseFuture();
+    await blocResponseFuture(millisecond: 300);
 
     viewBloc.add(
       const ViewEvent.createView(
         "Document 3",
         ViewLayoutPB.Document,
+        section: ViewSectionPB.Public,
       ),
     );
-    await blocResponseFuture();
+    await blocResponseFuture(millisecond: 300);
 
     allViews = [...viewBloc.state.view.childViews];
     assert(allViews.length == 3, 'but receive ${allViews.length}');
@@ -72,14 +75,14 @@ void main() {
         ..add(const ViewEvent.initial());
       await blocResponseFuture();
       deleteViewBloc.add(const ViewEvent.delete());
-      await blocResponseFuture();
+      await blocResponseFuture(millisecond: 1000);
       assert(context.viewBloc.state.view.childViews.length == 2);
       assert(trashBloc.state.objects.length == 1);
       assert(trashBloc.state.objects.first.id == deletedView.id);
 
       // put back
       trashBloc.add(TrashEvent.putback(deletedView.id));
-      await blocResponseFuture();
+      await blocResponseFuture(millisecond: 1000);
       assert(context.viewBloc.state.view.childViews.length == 3);
       assert(trashBloc.state.objects.isEmpty);
 
@@ -89,8 +92,7 @@ void main() {
           ..add(const ViewEvent.initial());
         await blocResponseFuture();
         deleteViewBloc.add(const ViewEvent.delete());
-        await blocResponseFuture();
-        await blocResponseFuture();
+        await blocResponseFuture(millisecond: 1000);
       }
       expect(trashBloc.state.objects[0].id, context.allViews[0].id);
       expect(trashBloc.state.objects[1].id, context.allViews[1].id);
@@ -98,12 +100,12 @@ void main() {
 
       // delete a view permanently
       trashBloc.add(TrashEvent.delete(trashBloc.state.objects[0]));
-      await blocResponseFuture();
+      await blocResponseFuture(millisecond: 1000);
       expect(trashBloc.state.objects.length, 2);
 
       // delete all view permanently
       trashBloc.add(const TrashEvent.deleteAll());
-      await blocResponseFuture();
+      await blocResponseFuture(millisecond: 1000);
       assert(
         trashBloc.state.objects.isEmpty,
         "but receive ${trashBloc.state.objects.length}",

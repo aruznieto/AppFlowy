@@ -29,12 +29,14 @@ class CalendarEventEditorBloc
       (event, emit) async {
         await event.when(
           initial: () {
+            rowController.initialize();
+
             _startListening();
             final primaryFieldId = fieldController.fieldInfos
                 .firstWhere((fieldInfo) => fieldInfo.isPrimary)
                 .id;
             final cells = rowController
-                .loadData()
+                .loadCells()
                 .where(
                   (cellContext) =>
                       _filterCellContext(cellContext, primaryFieldId),
@@ -46,9 +48,9 @@ class CalendarEventEditorBloc
             emit(state.copyWith(cells: cells));
           },
           delete: () async {
-            final result = await RowBackendService.deleteRow(
+            final result = await RowBackendService.deleteRows(
               rowController.viewId,
-              rowController.rowId,
+              [rowController.rowId],
             );
             result.fold((l) => null, (err) => Log.error(err));
           },
@@ -88,7 +90,7 @@ class CalendarEventEditorBloc
 
   @override
   Future<void> close() async {
-    rowController.dispose();
+    await rowController.dispose();
     return super.close();
   }
 }

@@ -27,7 +27,7 @@ String languageFromLocale(Locale locale) {
     case "ckb":
       switch (locale.countryCode) {
         case "KU":
-          return "کوردی";
+          return "کوردی سۆرانی";
         default:
           return locale.languageCode;
       }
@@ -37,6 +37,8 @@ String languageFromLocale(Locale locale) {
       return "Español";
     case "eu":
       return "Euskera";
+    case "el":
+      return "Ελληνικά";
     case "fr":
       switch (locale.countryCode) {
         case "CA":
@@ -46,6 +48,8 @@ String languageFromLocale(Locale locale) {
         default:
           return locale.languageCode;
       }
+    case "he":
+      return "עברית";
     case "hu":
       return "Magyar";
     case "id":

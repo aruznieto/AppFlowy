@@ -1,18 +1,24 @@
+use std::collections::HashMap;
 use std::mem;
+use std::ops::Deref;
 
 use anyhow::bail;
-use collab::core::any_map::AnyMapExtension;
+use collab::preclude::Any;
+use collab::util::AnyMapExt;
 use collab_database::database::gen_database_filter_id;
+use collab_database::fields::select_type_option::SelectOptionIds;
 use collab_database::rows::RowId;
+use collab_database::template::util::ToCellString;
 use collab_database::views::{FilterMap, FilterMapBuilder};
 use flowy_error::{FlowyError, FlowyResult};
 use lib_infra::box_any::BoxAny;
+use tracing::error;
 
 use crate::entities::{
-  CheckboxFilterPB, ChecklistFilterPB, DateFilterContentPB, DateFilterPB, FieldType, FilterType,
-  InsertedRowPB, NumberFilterPB, RelationFilterPB, SelectOptionFilterPB, TextFilterPB,
+  CheckboxFilterPB, ChecklistFilterPB, DateFilterContent, DateFilterPB, FieldType, FilterType,
+  InsertedRowPB, MediaFilterPB, NumberFilterPB, RelationFilterPB, SelectOptionFilterPB,
+  TextFilterPB, TimeFilterPB,
 };
-use crate::services::field::SelectOptionIds;
 
 pub trait ParseFilterData {
   fn parse(condition: u8, content: String) -> Self;
@@ -25,7 +31,8 @@ pub struct Filter {
 }
 
 impl Filter {
-  /// Recursively determine whether there are any data filters in the filter tree.
+  /// Recursively determine whether there are any data filters in the filter tree. A tree that has
+  /// multiple AND/OR filters but no Data filters is considered "empty".
   pub fn is_empty(&self) -> bool {
     match &self.inner {
       FilterInner::And { children } | FilterInner::Or { children } => children
@@ -36,6 +43,7 @@ impl Filter {
     }
   }
 
+  /// Recursively find a filter based on `filter_id`. Returns `None` if the filter cannot be found.
   pub fn find_filter(&mut self, filter_id: &str) -> Option<&mut Self> {
     if self.id == filter_id {
       return Some(self);
@@ -54,6 +62,8 @@ impl Filter {
     }
   }
 
+  /// Recursively find the parent of a filter whose id is `filter_id`. Returns `None` if the filter
+  /// cannot be found.
   pub fn find_parent_of_filter(&mut self, filter_id: &str) -> Option<&mut Self> {
     if self.id == filter_id {
       return None;
@@ -75,7 +85,7 @@ impl Filter {
     }
   }
 
-  /// converts a filter from And/Or/Data to And/Or. If the current type of the filter is Data,
+  /// Converts a filter from And/Or/Data to And/Or. If the current type of the filter is Data,
   /// return the FilterInner after the conversion.
   pub fn convert_to_and_or_filter_type(
     &mut self,
@@ -118,6 +128,10 @@ impl Filter {
     }
   }
 
+  /// Insert a filter into the current filter in the filter tree. If the current filter
+  /// is an AND/OR filter, then the filter is appended to its children. Otherwise, the current
+  /// filter is converted to an AND filter, after which the current data filter and the new filter
+  /// are added to the AND filter's children.
   pub fn insert_filter(&mut self, filter: Filter) -> FlowyResult<()> {
     match &mut self.inner {
       FilterInner::And { children } | FilterInner::Or { children } => {
@@ -141,6 +155,8 @@ impl Filter {
     Ok(())
   }
 
+  /// Update the criteria of a data filter. Return an error if the current filter is an AND/OR
+  /// filter.
   pub fn update_filter_data(&mut self, filter_data: FilterInner) -> FlowyResult<()> {
     match &self.inner {
       FilterInner::And { .. } | FilterInner::Or { .. } => Err(FlowyError::internal().with_context(
@@ -153,6 +169,9 @@ impl Filter {
     }
   }
 
+  /// Delete a filter based on `filter_id`. The current filter must be the parent of the filter
+  /// whose id is `filter_id`. Returns an error if the current filter is a Data filter (which
+  /// cannot have children), or the filter to be deleted cannot be found.
   pub fn delete_filter(&mut self, filter_id: &str) -> FlowyResult<()> {
     match &mut self.inner {
       FilterInner::And { children } | FilterInner::Or { children } => children
@@ -171,21 +190,60 @@ impl Filter {
     }
   }
 
-  pub fn find_all_filters_with_field_id(&mut self, matching_field_id: &str, ids: &mut Vec<String>) {
-    match &mut self.inner {
+  /// Recursively finds any Data filter whose `field_id` is equal to `matching_field_id`. Any found
+  /// filters' id is appended to the `ids` vector.
+  pub fn find_all_filters_with_field_id(&self, matching_field_id: &str, ids: &mut Vec<String>) {
+    match &self.inner {
       FilterInner::And { children } | FilterInner::Or { children } => {
-        for child_filter in children.iter_mut() {
+        for child_filter in children.iter() {
           child_filter.find_all_filters_with_field_id(matching_field_id, ids);
         }
       },
-      FilterInner::Data {
-        field_id,
-        field_type: _,
-        condition_and_content: _,
-      } => {
+      FilterInner::Data { field_id, .. } => {
         if field_id == matching_field_id {
           ids.push(self.id.clone());
         }
+      },
+    }
+  }
+
+  /// Recursively determine the smallest set of filters that loosely represents the filter tree. The
+  /// filters are appended to the `min_effective_filters` vector. The following rules are followed
+  /// when determining if a filter should get included. If the current filter is:
+  ///
+  /// 1. a Data filter, then it should be included.
+  /// 2. an AND filter, then all of its effective children should be
+  ///    included.
+  /// 3. an OR filter, then only the first child should be included.
+  pub fn get_min_effective_filters<'a>(&'a self, min_effective_filters: &mut Vec<&'a FilterInner>) {
+    match &self.inner {
+      FilterInner::And { children } => {
+        for filter in children.iter() {
+          filter.get_min_effective_filters(min_effective_filters);
+        }
+      },
+      FilterInner::Or { children } => {
+        if let Some(filter) = children.first() {
+          filter.get_min_effective_filters(min_effective_filters);
+        }
+      },
+      FilterInner::Data { .. } => min_effective_filters.push(&self.inner),
+    }
+  }
+
+  /// Recursively get all of the filtering field ids and the associated filter_ids
+  pub fn get_all_filtering_field_ids(&self, field_ids: &mut HashMap<String, Vec<String>>) {
+    match &self.inner {
+      FilterInner::And { children } | FilterInner::Or { children } => {
+        for child in children.iter() {
+          child.get_all_filtering_field_ids(field_ids);
+        }
+      },
+      FilterInner::Data { field_id, .. } => {
+        field_ids
+          .entry(field_id.clone())
+          .and_modify(|filter_ids| filter_ids.push(self.id.clone()))
+          .or_insert_with(|| vec![self.id.clone()]);
       },
     }
   }
@@ -218,15 +276,27 @@ impl FilterInner {
         BoxAny::new(TextFilterPB::parse(condition as u8, content))
       },
       FieldType::Number => BoxAny::new(NumberFilterPB::parse(condition as u8, content)),
-      FieldType::DateTime | FieldType::CreatedTime | FieldType::LastEditedTime => {
-        BoxAny::new(DateFilterPB::parse(condition as u8, content))
+      FieldType::DateTime => BoxAny::new(DateFilterPB::parse(condition as u8, content)),
+      FieldType::CreatedTime | FieldType::LastEditedTime => {
+        let filter = DateFilterPB::parse(condition as u8, content).remove_end_date_conditions();
+        BoxAny::new(filter)
       },
-      FieldType::SingleSelect | FieldType::MultiSelect => {
-        BoxAny::new(SelectOptionFilterPB::parse(condition as u8, content))
+      FieldType::SingleSelect => {
+        let filter =
+          SelectOptionFilterPB::parse(condition as u8, content).to_single_select_filter();
+        BoxAny::new(filter)
+      },
+      FieldType::MultiSelect => {
+        let filter = SelectOptionFilterPB::parse(condition as u8, content).to_multi_select_filter();
+        BoxAny::new(filter)
       },
       FieldType::Checklist => BoxAny::new(ChecklistFilterPB::parse(condition as u8, content)),
       FieldType::Checkbox => BoxAny::new(CheckboxFilterPB::parse(condition as u8, content)),
       FieldType::Relation => BoxAny::new(RelationFilterPB::parse(condition as u8, content)),
+      FieldType::Summary => BoxAny::new(TextFilterPB::parse(condition as u8, content)),
+      FieldType::Translate => BoxAny::new(TextFilterPB::parse(condition as u8, content)),
+      FieldType::Time => BoxAny::new(TimeFilterPB::parse(condition as u8, content)),
+      FieldType::Media => BoxAny::new(MediaFilterPB::parse(condition as u8, content)),
     };
 
     FilterInner::Data {
@@ -259,13 +329,20 @@ const FILTER_DATA_INDEX: i64 = 2;
 
 impl<'a> From<&'a Filter> for FilterMap {
   fn from(filter: &'a Filter) -> Self {
-    let mut builder = FilterMapBuilder::new()
-      .insert_str_value(FILTER_ID, &filter.id)
-      .insert_i64_value(FILTER_TYPE, filter.inner.get_int_repr());
+    let mut builder = FilterMapBuilder::from([
+      (FILTER_ID.into(), filter.id.as_str().into()),
+      (FILTER_TYPE.into(), Any::BigInt(filter.inner.get_int_repr())),
+    ]);
 
     builder = match &filter.inner {
       FilterInner::And { children } | FilterInner::Or { children } => {
-        builder.insert_maps(FILTER_CHILDREN, children.iter().collect::<Vec<&Filter>>())
+        let mut vec = Vec::with_capacity(children.len());
+        for child in children.iter() {
+          let any: Any = FilterMap::from(child).into();
+          vec.push(any);
+        }
+        builder.insert(FILTER_CHILDREN.into(), Any::from(vec));
+        builder
       },
       FilterInner::Data {
         field_id,
@@ -284,17 +361,17 @@ impl<'a> From<&'a Filter> for FilterMap {
             },
             FieldType::DateTime | FieldType::LastEditedTime | FieldType::CreatedTime => {
               let filter = condition_and_content.cloned::<DateFilterPB>()?;
-              let content = DateFilterContentPB {
+              let content = DateFilterContent {
                 start: filter.start,
                 end: filter.end,
                 timestamp: filter.timestamp,
               }
-              .to_string();
+              .to_json_string();
               (filter.condition as u8, content)
             },
             FieldType::SingleSelect | FieldType::MultiSelect => {
               let filter = condition_and_content.cloned::<SelectOptionFilterPB>()?;
-              let content = SelectOptionIds::from(filter.option_ids).to_string();
+              let content = SelectOptionIds::from(filter.option_ids).to_cell_string();
               (filter.condition as u8, content)
             },
             FieldType::Checkbox => {
@@ -309,6 +386,22 @@ impl<'a> From<&'a Filter> for FilterMap {
               let filter = condition_and_content.cloned::<RelationFilterPB>()?;
               (filter.condition as u8, "".to_string())
             },
+            FieldType::Summary => {
+              let filter = condition_and_content.cloned::<TextFilterPB>()?;
+              (filter.condition as u8, filter.content)
+            },
+            FieldType::Time => {
+              let filter = condition_and_content.cloned::<TimeFilterPB>()?;
+              (filter.condition as u8, filter.content)
+            },
+            FieldType::Translate => {
+              let filter = condition_and_content.cloned::<TextFilterPB>()?;
+              (filter.condition as u8, filter.content)
+            },
+            FieldType::Media => {
+              let filter = condition_and_content.cloned::<MediaFilterPB>()?;
+              (filter.condition as u8, filter.content)
+            },
           };
           Some((condition, content))
         };
@@ -318,15 +411,15 @@ impl<'a> From<&'a Filter> for FilterMap {
           Default::default()
         });
 
+        builder.insert(FIELD_ID.into(), field_id.as_str().into());
+        builder.insert(FIELD_TYPE.into(), Any::BigInt(i64::from(field_type)));
+        builder.insert(FILTER_CONDITION.into(), Any::BigInt(condition as i64));
+        builder.insert(FILTER_CONTENT.into(), content.into());
         builder
-          .insert_str_value(FIELD_ID, field_id)
-          .insert_i64_value(FIELD_TYPE, field_type.into())
-          .insert_i64_value(FILTER_CONDITION, condition as i64)
-          .insert_str_value(FILTER_CONTENT, content)
       },
     };
 
-    builder.build()
+    builder
   }
 }
 
@@ -334,32 +427,30 @@ impl TryFrom<FilterMap> for Filter {
   type Error = anyhow::Error;
 
   fn try_from(filter_map: FilterMap) -> Result<Self, Self::Error> {
-    let filter_id = filter_map
-      .get_str_value(FILTER_ID)
+    let filter_id: String = filter_map
+      .get_as(FILTER_ID)
       .ok_or_else(|| anyhow::anyhow!("invalid filter data"))?;
-    let filter_type = filter_map
-      .get_i64_value(FILTER_TYPE)
-      .unwrap_or(FILTER_DATA_INDEX);
+    let filter_type: i64 = filter_map.get_as(FILTER_TYPE).unwrap_or(FILTER_DATA_INDEX);
 
     let filter = Filter {
       id: filter_id,
       inner: match filter_type {
         FILTER_AND_INDEX => FilterInner::And {
-          children: filter_map.try_get_array(FILTER_CHILDREN),
+          children: get_children(filter_map),
         },
         FILTER_OR_INDEX => FilterInner::Or {
-          children: filter_map.try_get_array(FILTER_CHILDREN),
+          children: get_children(filter_map),
         },
         FILTER_DATA_INDEX => {
-          let field_id = filter_map
-            .get_str_value(FIELD_ID)
+          let field_id: String = filter_map
+            .get_as(FIELD_ID)
             .ok_or_else(|| anyhow::anyhow!("invalid filter data"))?;
           let field_type = filter_map
-            .get_i64_value(FIELD_TYPE)
+            .get_as::<i64>(FIELD_TYPE)
             .map(FieldType::from)
             .unwrap_or_default();
-          let condition = filter_map.get_i64_value(FILTER_CONDITION).unwrap_or(0);
-          let content = filter_map.get_str_value(FILTER_CONTENT).unwrap_or_default();
+          let condition: i64 = filter_map.get_as(FILTER_CONDITION).unwrap_or_default();
+          let content: String = filter_map.get_as(FILTER_CONTENT).unwrap_or_default();
 
           FilterInner::new_data(field_id, field_type, condition, content)
         },
@@ -369,6 +460,27 @@ impl TryFrom<FilterMap> for Filter {
 
     Ok(filter)
   }
+}
+
+fn get_children(filter_map: FilterMap) -> Vec<Filter> {
+  //TODO: this method wouldn't be necessary if we could make Filters serializable in backward
+  // compatible way
+  let mut result = Vec::new();
+  if let Some(Any::Array(children)) = filter_map.get(FILTER_CHILDREN) {
+    for child in children.iter() {
+      if let Any::Map(child_map) = child {
+        match Filter::try_from(child_map.deref().clone()) {
+          Ok(filter) => {
+            result.push(filter);
+          },
+          Err(err) => {
+            error!("Failed to deserialize filter: {:?}", err);
+          },
+        }
+      }
+    }
+  }
+  result
 }
 
 #[derive(Debug)]
@@ -387,7 +499,6 @@ pub enum FilterChangeset {
   },
   Delete {
     filter_id: String,
-    field_id: String,
   },
   DeleteAllWithFieldId {
     field_id: String,

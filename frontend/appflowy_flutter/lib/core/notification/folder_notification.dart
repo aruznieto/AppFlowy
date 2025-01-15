@@ -9,11 +9,8 @@ import 'package:appflowy_result/appflowy_result.dart';
 
 import 'notification_helper.dart';
 
-// Folder
-typedef FolderNotificationCallback = void Function(
-  FolderNotification,
-  FlowyResult<Uint8List, FlowyError>,
-);
+// This value should be the same as the FOLDER_OBSERVABLE_SOURCE value
+const String _source = 'Workspace';
 
 class FolderNotificationParser
     extends NotificationParser<FolderNotification, FlowyError> {
@@ -21,7 +18,8 @@ class FolderNotificationParser
     super.id,
     required super.callback,
   }) : super(
-          tyParser: (ty) => FolderNotification.valueOf(ty),
+          tyParser: (ty, source) =>
+              source == _source ? FolderNotification.valueOf(ty) : null,
           errorParser: (bytes) => FlowyError.fromBuffer(bytes),
         );
 }

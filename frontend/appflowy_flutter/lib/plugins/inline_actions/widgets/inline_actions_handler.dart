@@ -1,5 +1,4 @@
-import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
+import 'dart:async';
 
 import 'package:appflowy/generated/locale_keys.g.dart';
 import 'package:appflowy/plugins/inline_actions/inline_actions_menu.dart';
@@ -10,13 +9,16 @@ import 'package:appflowy_editor/appflowy_editor.dart';
 import 'package:collection/collection.dart';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flowy_infra_ui/style_widget/text.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 /// All heights are in physical pixels
 const double _groupTextHeight = 14; // 12 height + 2 bottom spacing
 const double _groupBottomSpacing = 6;
 const double _itemHeight = 30; // 26 height + 4 vertical spacing (2*2)
 
-const double _menuHeight = 300;
+const double kInlineMenuHeight = 300;
+const double kInlineMenuWidth = 400;
 const double _contentHeight = 260;
 
 extension _StartWithsSort on List<InlineActionsResult> {
@@ -47,7 +49,7 @@ extension _StartWithsSort on List<InlineActionsResult> {
       );
 }
 
-const _invalidSearchesAmount = 20;
+const _invalidSearchesAmount = 10;
 
 class InlineActionsHandler extends StatefulWidget {
   const InlineActionsHandler({
@@ -60,6 +62,7 @@ class InlineActionsHandler extends StatefulWidget {
     required this.onSelectionUpdate,
     required this.style,
     this.startCharAmount = 1,
+    this.cancelBySpaceHandler,
   });
 
   final InlineActionsService service;
@@ -70,6 +73,7 @@ class InlineActionsHandler extends StatefulWidget {
   final VoidCallback onSelectionUpdate;
   final InlineActionsMenuStyle style;
   final int startCharAmount;
+  final bool Function()? cancelBySpaceHandler;
 
   @override
   State<InlineActionsHandler> createState() => _InlineActionsHandlerState();
@@ -104,10 +108,13 @@ class _InlineActionsHandlerState extends State<InlineActionsHandler> {
         : 0;
 
     if (invalidCounter >= _invalidSearchesAmount) {
+      widget.onDismiss();
+
       // Workaround to bring focus back to editor
       await widget.editorState
           .updateSelectionWithReason(widget.editorState.selection);
-      return widget.onDismiss();
+
+      return;
     }
 
     _resetSelection();
@@ -147,7 +154,10 @@ class _InlineActionsHandlerState extends State<InlineActionsHandler> {
       focusNode: _focusNode,
       onKeyEvent: onKeyEvent,
       child: Container(
-        constraints: BoxConstraints.loose(const Size(200, _menuHeight)),
+        constraints: const BoxConstraints(
+          maxHeight: kInlineMenuHeight,
+          minWidth: kInlineMenuWidth,
+        ),
         decoration: BoxDecoration(
           color: widget.style.backgroundColor,
           borderRadius: BorderRadius.circular(6.0),
@@ -280,12 +290,17 @@ class _InlineActionsHandlerState extends State<InlineActionsHandler> {
       /// that the selection change occurred from the handler.
       widget.onSelectionUpdate();
 
+      if (event.logicalKey == LogicalKeyboardKey.space) {
+        final cancelBySpaceHandler = widget.cancelBySpaceHandler;
+        if (cancelBySpaceHandler != null && cancelBySpaceHandler()) {
+          return KeyEventResult.handled;
+        }
+      }
+
       // Interpolation to avoid having a getter for private variable
       _insertCharacter(event.character!);
       return KeyEventResult.handled;
-    }
-
-    if (moveKeys.contains(event.logicalKey)) {
+    } else if (moveKeys.contains(event.logicalKey)) {
       _moveSelection(event.logicalKey);
       return KeyEventResult.handled;
     }

@@ -9,8 +9,6 @@ import 'package:appflowy_result/appflowy_result.dart';
 import 'package:flowy_infra/notifier.dart';
 import 'package:protobuf/protobuf.dart';
 
-typedef OnGroupError = void Function(FlowyError);
-
 abstract class GroupControllerDelegate {
   bool hasGroup(String groupId);
   void removeRow(GroupPB group, RowId rowId);
@@ -31,23 +29,11 @@ class GroupController {
   final GroupControllerDelegate delegate;
   final void Function(GroupPB group) onGroupChanged;
 
-  RowMetaPB? rowAtIndex(int index) {
-    if (index < group.rows.length) {
-      return group.rows[index];
-    } else {
-      return null;
-    }
-  }
+  RowMetaPB? rowAtIndex(int index) => group.rows.elementAtOrNull(index);
 
-  RowMetaPB? firstRow() {
-    if (group.rows.isEmpty) return null;
-    return group.rows.first;
-  }
+  RowMetaPB? firstRow() => group.rows.firstOrNull;
 
-  RowMetaPB? lastRow() {
-    if (group.rows.isEmpty) return null;
-    return group.rows.last;
-  }
+  RowMetaPB? lastRow() => group.rows.lastOrNull;
 
   void startListening() {
     _listener.start(
@@ -64,6 +50,10 @@ class GroupController {
             }
 
             for (final insertedRow in changeset.insertedRows) {
+              if (newItems.any((rowPB) => rowPB.id == insertedRow.rowMeta.id)) {
+                continue;
+              }
+
               final index = insertedRow.hasIndex() ? insertedRow.index : null;
               if (insertedRow.hasIndex() &&
                   newItems.length > insertedRow.index) {
@@ -94,11 +84,14 @@ class GroupController {
               }
             }
 
-            group.freeze();
             group = group.rebuild((group) {
               group.rows.clear();
               group.rows.addAll(newItems);
             });
+            group.freeze();
+            Log.debug(
+              "Build GroupPB:${group.groupId}: items: ${group.rows.length}",
+            );
             onGroupChanged(group);
           },
           (err) => Log.error(err),
@@ -107,8 +100,8 @@ class GroupController {
     );
   }
 
-  Future<void> dispose() {
-    return _listener.stop();
+  Future<void> dispose() async {
+    await _listener.stop();
   }
 }
 

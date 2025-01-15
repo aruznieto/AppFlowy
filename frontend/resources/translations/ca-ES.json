@@ -44,10 +44,10 @@
     "repeatPasswordEmptyError": "La contrasenya repetida no pot ser buida",
     "unmatchedPasswordError": "Les contrasenyes no concorden",
     "or": "O",
+    "signInWith": "Inicia sessió amb:",
     "LogInWithGoogle": "Inicieu sessió amb Google",
     "LogInWithGithub": "Inicieu sessió amb Github",
     "LogInWithDiscord": "Inicieu sessió amb Discord",
-    "signInWith": "Inicia sessió amb:",
     "loginAsGuestButtonText": "Començar"
   },
   "workspace": {
@@ -270,7 +270,7 @@
       "invalidCloudURLScheme": "Esquema no vàlid",
       "cloudServerType": "Servidor al núvol",
       "cloudLocal": "Local",
-      "cloudAppFlowy": "AppFlowy Cloud Beta",
+      "cloudAppFlowy": "@:appName Cloud Beta",
       "clickToCopy": "Feu clic per copiar",
       "selfHostContent": "document",
       "cloudURLHint": "Introduïu l'URL base del vostre servidor",
@@ -278,8 +278,7 @@
       "inputEncryptPrompt": "Introduïu el vostre secret de xifratge per a",
       "clickToCopySecret": "Feu clic per copiar el secret",
       "inputTextFieldHint": "El teu secret",
-      "importSuccess": "S'ha importat correctament la carpeta de dades d'AppFlowy",
-      "supabaseSetting": "Configuració Supabase"
+      "importSuccess": "S'ha importat correctament la carpeta de dades d'@:appName"
     },
     "notifications": {
       "enableNotifications": {
@@ -319,7 +318,7 @@
       "themeUpload": {
         "button": "Carrega",
         "uploadTheme": "Carrega el tema",
-        "description": "Carregueu el vostre propi tema AppFlowy amb el botó següent.",
+        "description": "Carregueu el vostre propi tema @:appName amb el botó següent.",
         "loading": "Si us plau, espereu mentre validem i carreguem el vostre tema...",
         "uploadSuccess": "El teu tema s'ha penjat correctament",
         "deletionFailure": "No s'ha pogut suprimir el tema. Intenta esborrar-lo manualment.",
@@ -347,7 +346,7 @@
       "defaultLocation": "Llegir fitxers i ubicació d'emmagatzematge de dades",
       "exportData": "Exporteu les vostres dades",
       "doubleTapToCopy": "Fes doble toc per copiar el camí",
-      "restoreLocation": "Restaura al camí predeterminat d'AppFlowy",
+      "restoreLocation": "Restaura al camí predeterminat d'@:appName",
       "customizeLocation": "Obriu una altra carpeta",
       "restartApp": "Si us plau, reinicieu l'aplicació perquè els canvis tinguin efecte.",
       "exportDatabase": "Exportar la base de dades",
@@ -359,10 +358,10 @@
       "defineWhereYourDataIsStored": "Definiu on s'emmagatzemen les vostres dades",
       "open": "Obert",
       "openFolder": "Obre una carpeta existent",
-      "openFolderDesc": "Llegiu-lo i escriviu-lo a la vostra carpeta AppFlowy existent",
+      "openFolderDesc": "Llegiu-lo i escriviu-lo a la vostra carpeta @:appName existent",
       "folderHintText": "nom de la carpeta",
       "location": "Creació d'una carpeta nova",
-      "locationDesc": "Trieu un nom per a la vostra carpeta de dades d'AppFlowy",
+      "locationDesc": "Trieu un nom per a la vostra carpeta de dades d'@:appName",
       "browser": "Navega",
       "create": "Crear",
       "set": "Conjunt",
@@ -373,7 +372,7 @@
       "change": "Canviar",
       "openLocationTooltips": "Obriu un altre directori de dades",
       "openCurrentDataFolder": "Obre el directori de dades actual",
-      "recoverLocationTooltips": "Restableix al directori de dades predeterminat d'AppFlowy",
+      "recoverLocationTooltips": "Restableix al directori de dades predeterminat d'@:appName",
       "exportFileSuccess": "Exporta el fitxer correctament!",
       "exportFileFail": "Ha fallat l'exportació del fitxer!",
       "export": "Exporta"
@@ -383,11 +382,7 @@
       "email": "Correu electrònic",
       "tooltipSelectIcon": "Seleccioneu la icona",
       "selectAnIcon": "Seleccioneu una icona",
-      "pleaseInputYourOpenAIKey": "si us plau, introduïu la vostra clau OpenAI"
-    },
-    "shortcuts": {
-      "command": "Comandament",
-      "addNewCommand": "Afegeix una comanda nova"
+      "pleaseInputYourOpenAIKey": "si us plau, introduïu la vostra clau AI"
     },
     "mobile": {
       "personalInfo": "Informació personal",
@@ -402,6 +397,10 @@
       "userprofileError": "No s'ha pogut carregar el perfil d'usuari",
       "selectStartingDay": "Seleccioneu el dia d'inici",
       "version": "Versió"
+    },
+    "shortcuts": {
+      "command": "Comandament",
+      "addNewCommand": "Afegeix una comanda nova"
     }
   },
   "grid": {
@@ -602,23 +601,23 @@
       "referencedBoard": "Junta de referència",
       "referencedGrid": "Quadrícula de referència",
       "referencedCalendar": "Calendari de referència",
-      "autoGeneratorMenuItemName": "OpenAI Writer",
-      "autoGeneratorTitleName": "OpenAI: Demana a AI que escrigui qualsevol cosa...",
+      "autoGeneratorMenuItemName": "AI Writer",
+      "autoGeneratorTitleName": "AI: Demana a AI que escrigui qualsevol cosa...",
       "autoGeneratorLearnMore": "Aprèn més",
       "autoGeneratorGenerate": "Generar",
-      "autoGeneratorHintText": "Pregunta a OpenAI...",
-      "autoGeneratorCantGetOpenAIKey": "No es pot obtenir la clau OpenAI",
+      "autoGeneratorHintText": "Pregunta a AI...",
+      "autoGeneratorCantGetOpenAIKey": "No es pot obtenir la clau AI",
       "autoGeneratorRewrite": "Reescriure",
       "smartEdit": "Assistents d'IA",
-      "openAI": "OpenAI",
+      "aI": "AI",
       "smartEditFixSpelling": "Corregir l'ortografia",
       "warning": "⚠️ Les respostes de la IA poden ser inexactes o enganyoses.",
       "smartEditSummarize": "Resumir",
       "smartEditImproveWriting": "Millorar l'escriptura",
       "smartEditMakeLonger": "Fer més llarg",
-      "smartEditCouldNotFetchResult": "No s'ha pogut obtenir el resultat d'OpenAI",
-      "smartEditCouldNotFetchKey": "No s'ha pogut obtenir la clau OpenAI",
-      "smartEditDisabled": "Connecteu OpenAI a Configuració",
+      "smartEditCouldNotFetchResult": "No s'ha pogut obtenir el resultat d'AI",
+      "smartEditCouldNotFetchKey": "No s'ha pogut obtenir la clau AI",
+      "smartEditDisabled": "Connecteu AI a Configuració",
       "discardResponse": "Voleu descartar les respostes d'IA?",
       "createInlineMathEquation": "Crea una equació",
       "fonts": "Fonts",
@@ -671,8 +670,8 @@
         "defaultColor": "Per defecte"
       },
       "image": {
-        "copiedToPasteBoard": "L'enllaç de la imatge s'ha copiat al porta-retalls",
-        "addAnImage": "Afegeix una imatge"
+        "addAnImage": "Afegeix una imatge",
+        "copiedToPasteBoard": "L'enllaç de la imatge s'ha copiat al porta-retalls"
       },
       "outline": {
         "addHeadingToCreateOutline": "Afegiu títols per crear una taula de continguts."
@@ -714,7 +713,7 @@
         "placeholder": "Introduïu l'URL de la imatge"
       },
       "ai": {
-        "label": "Generar imatge des d'OpenAI"
+        "label": "Generar imatge des d'AI"
       },
       "support": "El límit de mida de la imatge és de 5 MB. Formats admesos: JPEG, PNG, GIF, SVG",
       "error": {
@@ -762,7 +761,12 @@
       "createNewCard": "Nou"
     },
     "menuName": "Pissarra",
-    "referencedBoardPrefix": "Vista de"
+    "referencedBoardPrefix": "Vista de",
+    "mobile": {
+      "showGroup": "Mostra grup",
+      "showGroupContent": "Esteu segur que voleu mostrar aquest grup al tauler?",
+      "failedToLoad": "No s'ha pogut carregar la vista del tauler"
+    }
   },
   "calendar": {
     "menuName": "Calendari",
@@ -786,7 +790,7 @@
     "referencedCalendarPrefix": "Vista de"
   },
   "errorDialog": {
-    "title": "Error d'AppFlowy",
+    "title": "Error d'@:appName",
     "howToFixFallback": "Lamentem les molèsties! Envieu un problema a la nostra pàgina de GitHub que descrigui el vostre error.",
     "github": "Veure a GitHub"
   },

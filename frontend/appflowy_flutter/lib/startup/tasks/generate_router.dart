@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:appflowy/mobile/presentation/chat/mobile_chat_screen.dart';
 import 'package:appflowy/mobile/presentation/database/board/mobile_board_screen.dart';
 import 'package:appflowy/mobile/presentation/database/card/card.dart';
 import 'package:appflowy/mobile/presentation/database/date_picker/mobile_date_picker_screen.dart';
@@ -9,12 +10,14 @@ import 'package:appflowy/mobile/presentation/database/mobile_calendar_events_scr
 import 'package:appflowy/mobile/presentation/database/mobile_calendar_screen.dart';
 import 'package:appflowy/mobile/presentation/database/mobile_grid_screen.dart';
 import 'package:appflowy/mobile/presentation/favorite/mobile_favorite_page.dart';
-import 'package:appflowy/mobile/presentation/notifications/mobile_notifications_page.dart';
+import 'package:appflowy/mobile/presentation/notifications/mobile_notifications_multiple_select_page.dart';
+import 'package:appflowy/mobile/presentation/notifications/mobile_notifications_screen.dart';
 import 'package:appflowy/mobile/presentation/presentation.dart';
 import 'package:appflowy/mobile/presentation/setting/cloud/appflowy_cloud_page.dart';
 import 'package:appflowy/mobile/presentation/setting/font/font_picker_screen.dart';
 import 'package:appflowy/mobile/presentation/setting/language/language_picker_screen.dart';
 import 'package:appflowy/mobile/presentation/setting/launch_settings_page.dart';
+import 'package:appflowy/mobile/presentation/setting/workspace/invite_members_screen.dart';
 import 'package:appflowy/plugins/base/color/color_picker_screen.dart';
 import 'package:appflowy/plugins/base/emoji/emoji_picker_screen.dart';
 import 'package:appflowy/plugins/document/presentation/editor_plugins/code_block/code_language_screen.dart';
@@ -25,12 +28,17 @@ import 'package:appflowy/startup/tasks/app_widget.dart';
 import 'package:appflowy/user/application/auth/auth_service.dart';
 import 'package:appflowy/user/presentation/presentation.dart';
 import 'package:appflowy/workspace/presentation/home/desktop_home_screen.dart';
+import 'package:appflowy/workspace/presentation/settings/widgets/feature_flags/mobile_feature_flag_screen.dart';
+import 'package:appflowy_backend/log.dart';
 import 'package:appflowy_backend/protobuf/flowy-database2/protobuf.dart';
-import 'package:appflowy_editor/appflowy_editor.dart';
 import 'package:flowy_infra/time/duration.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:sheet/route.dart';
+import 'package:universal_platform/universal_platform.dart';
+
+import '../../shared/icon_emoji_picker/tab.dart';
 
 GoRouter generateRouter(Widget child) {
   return GoRouter(
@@ -46,19 +54,21 @@ GoRouter generateRouter(Widget child) {
       _encryptSecretScreenRoute(),
       _workspaceErrorScreenRoute(),
       // Desktop only
-      if (!PlatformExtension.isMobile) _desktopHomeScreenRoute(),
+      if (UniversalPlatform.isDesktop) _desktopHomeScreenRoute(),
       // Mobile only
-      if (PlatformExtension.isMobile) ...[
+      if (UniversalPlatform.isMobile) ...[
         // settings
         _mobileHomeSettingPageRoute(),
         _mobileCloudSettingAppFlowyCloudPageRoute(),
         _mobileLaunchSettingsPageRoute(),
+        _mobileFeatureFlagPageRoute(),
 
         // view page
         _mobileEditorScreenRoute(),
         _mobileGridScreenRoute(),
         _mobileBoardScreenRoute(),
         _mobileCalendarScreenRoute(),
+        _mobileChatScreenRoute(),
         // card detail page
         _mobileCardDetailScreenRoute(),
         _mobileDateCellEditScreenRoute(),
@@ -88,6 +98,12 @@ GoRouter generateRouter(Widget child) {
         _mobileCalendarEventsPageRoute(),
 
         _mobileBlockSettingsPageRoute(),
+
+        // notifications
+        _mobileNotificationMultiSelectPageRoute(),
+
+        // invite members
+        _mobileInviteMembersPageRoute(),
       ],
 
       // Desktop and Mobile
@@ -155,33 +171,11 @@ StatefulShellRoute _mobileHomeScreenWithNavigationBarRoute() {
           ),
         ],
       ),
-      // Enable search feature after we have a search page.
-      // StatefulShellBranch(
-      //   routes: <RouteBase>[
-      //     GoRoute(
-      //       path: '/d',
-      //       builder: (BuildContext context, GoRouterState state) =>
-      //           const RootPlaceholderScreen(
-      //         label: 'Search',
-      //         detailsPath: '/d/details',
-      //       ),
-      //       routes: <RouteBase>[
-      //         GoRoute(
-      //           path: 'details',
-      //           builder: (BuildContext context, GoRouterState state) =>
-      //               const DetailsPlaceholderScreen(
-      //             label: 'Search Page details',
-      //           ),
-      //         ),
-      //       ],
-      //     ),
-      //   ],
-      // ),
       StatefulShellBranch(
         routes: <RouteBase>[
           GoRoute(
-            path: MobileNotificationsScreen.routeName,
-            builder: (_, __) => const MobileNotificationsScreen(),
+            path: MobileNotificationsScreenV2.routeName,
+            builder: (_, __) => const MobileNotificationsScreenV2(),
           ),
         ],
       ),
@@ -195,6 +189,30 @@ GoRoute _mobileHomeSettingPageRoute() {
     path: MobileHomeSettingPage.routeName,
     pageBuilder: (context, state) {
       return const MaterialExtendedPage(child: MobileHomeSettingPage());
+    },
+  );
+}
+
+GoRoute _mobileNotificationMultiSelectPageRoute() {
+  return GoRoute(
+    parentNavigatorKey: AppGlobals.rootNavKey,
+    path: MobileNotificationsMultiSelectScreen.routeName,
+    pageBuilder: (context, state) {
+      return const MaterialExtendedPage(
+        child: MobileNotificationsMultiSelectScreen(),
+      );
+    },
+  );
+}
+
+GoRoute _mobileInviteMembersPageRoute() {
+  return GoRoute(
+    parentNavigatorKey: AppGlobals.rootNavKey,
+    path: InviteMembersScreen.routeName,
+    pageBuilder: (context, state) {
+      return const MaterialExtendedPage(
+        child: InviteMembersScreen(),
+      );
     },
   );
 }
@@ -215,6 +233,16 @@ GoRoute _mobileLaunchSettingsPageRoute() {
     path: MobileLaunchSettingsPage.routeName,
     pageBuilder: (context, state) {
       return const MaterialExtendedPage(child: MobileLaunchSettingsPage());
+    },
+  );
+}
+
+GoRoute _mobileFeatureFlagPageRoute() {
+  return GoRoute(
+    parentNavigatorKey: AppGlobals.rootNavKey,
+    path: FeatureFlagScreen.routeName,
+    pageBuilder: (context, state) {
+      return const MaterialExtendedPage(child: FeatureFlagScreen());
     },
   );
 }
@@ -256,10 +284,28 @@ GoRoute _mobileEmojiPickerPageRoute() {
     pageBuilder: (context, state) {
       final title =
           state.uri.queryParameters[MobileEmojiPickerScreen.pageTitle];
+      final selectTabs =
+          state.uri.queryParameters[MobileEmojiPickerScreen.selectTabs] ?? '';
+      final selectedType = state
+          .uri.queryParameters[MobileEmojiPickerScreen.iconSelectedType]
+          ?.toPickerTabType();
+      List<PickerTabType> tabs = [];
+      try {
+        tabs = selectTabs
+            .split('-')
+            .map((e) => PickerTabType.values.byName(e))
+            .toList();
+      } on ArgumentError catch (e) {
+        Log.error('convert selectTabs to pickerTab error', e);
+      }
       return MaterialExtendedPage(
-        child: MobileEmojiPickerScreen(
-          title: title,
-        ),
+        child: tabs.isEmpty
+            ? MobileEmojiPickerScreen(title: title, selectedType: selectedType)
+            : MobileEmojiPickerScreen(
+                title: title,
+                selectedType: selectedType,
+                tabs: tabs,
+              ),
       );
     },
   );
@@ -463,14 +509,43 @@ GoRoute _signInScreenRoute() {
 
 GoRoute _mobileEditorScreenRoute() {
   return GoRoute(
-    path: MobileEditorScreen.routeName,
+    path: MobileDocumentScreen.routeName,
     parentNavigatorKey: AppGlobals.rootNavKey,
     pageBuilder: (context, state) {
-      final id = state.uri.queryParameters[MobileEditorScreen.viewId]!;
-      final title = state.uri.queryParameters[MobileEditorScreen.viewTitle];
+      final id = state.uri.queryParameters[MobileDocumentScreen.viewId]!;
+      final title = state.uri.queryParameters[MobileDocumentScreen.viewTitle];
+      final showMoreButton = bool.tryParse(
+        state.uri.queryParameters[MobileDocumentScreen.viewShowMoreButton] ??
+            'true',
+      );
+      final fixedTitle =
+          state.uri.queryParameters[MobileDocumentScreen.viewFixedTitle];
+      final blockId =
+          state.uri.queryParameters[MobileDocumentScreen.viewBlockId];
 
       return MaterialExtendedPage(
-        child: MobileEditorScreen(id: id, title: title),
+        child: MobileDocumentScreen(
+          id: id,
+          title: title,
+          showMoreButton: showMoreButton ?? true,
+          fixedTitle: fixedTitle,
+          blockId: blockId,
+        ),
+      );
+    },
+  );
+}
+
+GoRoute _mobileChatScreenRoute() {
+  return GoRoute(
+    path: MobileChatScreen.routeName,
+    parentNavigatorKey: AppGlobals.rootNavKey,
+    pageBuilder: (context, state) {
+      final id = state.uri.queryParameters[MobileChatScreen.viewId]!;
+      final title = state.uri.queryParameters[MobileChatScreen.viewTitle];
+
+      return MaterialExtendedPage(
+        child: MobileChatScreen(id: id, title: title),
       );
     },
   );
@@ -535,10 +610,25 @@ GoRoute _mobileCardDetailScreenRoute() {
     parentNavigatorKey: AppGlobals.rootNavKey,
     path: MobileRowDetailPage.routeName,
     pageBuilder: (context, state) {
-      final args = state.extra as Map<String, dynamic>;
+      var extra = state.extra as Map<String, dynamic>?;
+
+      if (kDebugMode && extra == null) {
+        extra = _dynamicValues;
+      }
+
+      if (extra == null) {
+        return const MaterialExtendedPage(
+          child: SizedBox.shrink(),
+        );
+      }
+
       final databaseController =
-          args[MobileRowDetailPage.argDatabaseController];
-      final rowId = args[MobileRowDetailPage.argRowId]!;
+          extra[MobileRowDetailPage.argDatabaseController];
+      final rowId = extra[MobileRowDetailPage.argRowId]!;
+
+      if (kDebugMode) {
+        _dynamicValues = extra;
+      }
 
       return MaterialExtendedPage(
         child: MobileRowDetailPage(
@@ -577,13 +667,13 @@ GoRoute _rootRoute(Widget child) {
   return GoRoute(
     path: '/',
     redirect: (context, state) async {
-      // Every time before navigating to splash screen, we check if user is already logged in in desktop. It is used to skip showing splash screen when user just changes apperance settings like theme mode.
+      // Every time before navigating to splash screen, we check if user is already logged in desktop. It is used to skip showing splash screen when user just changes appearance settings like theme mode.
       final userResponse = await getIt<AuthService>().getUser();
       final routeName = userResponse.fold(
         (user) => DesktopHomeScreen.routeName,
         (error) => null,
       );
-      if (routeName != null && !PlatformExtension.isMobile) return routeName;
+      if (routeName != null && !UniversalPlatform.isMobile) return routeName;
 
       return null;
     },
@@ -606,3 +696,8 @@ Widget _buildFadeTransition(
 Duration _slowDuration = Duration(
   milliseconds: RouteDurations.slow.inMilliseconds.round(),
 );
+
+// ONLY USE IN DEBUG MODE
+// this is a workaround for the issue of GoRouter not supporting extra with complex types
+// https://github.com/flutter/flutter/issues/137248
+Map<String, dynamic> _dynamicValues = {};

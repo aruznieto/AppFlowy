@@ -4,12 +4,11 @@ use std::fs::File;
 use std::path::{Path, PathBuf};
 use std::time::SystemTime;
 use std::{fs, io};
-
 use tempfile::tempdir;
 use walkdir::WalkDir;
 use zip::write::FileOptions;
-use zip::ZipArchive;
 use zip::ZipWriter;
+use zip::{CompressionMethod, ZipArchive};
 
 pub fn copy_dir_recursive(src: &Path, dst: &Path) -> io::Result<()> {
   for entry in WalkDir::new(src).into_iter().filter_map(|e| e.ok()) {
@@ -69,48 +68,67 @@ where
 }
 
 pub fn zip_folder(src_path: impl AsRef<Path>, dest_path: &Path) -> io::Result<()> {
-  if !src_path.as_ref().exists() {
-    return Err(io::ErrorKind::NotFound.into());
+  let src_path = src_path.as_ref();
+
+  // Check if source path exists
+  if !src_path.exists() {
+    return Err(io::Error::new(
+      io::ErrorKind::NotFound,
+      "Source path not found",
+    ));
   }
 
-  if src_path.as_ref() == dest_path {
-    return Err(io::ErrorKind::InvalidInput.into());
+  // Check if source and destination paths are the same
+  if src_path == dest_path {
+    return Err(io::Error::new(
+      io::ErrorKind::InvalidInput,
+      "Source and destination paths cannot be the same",
+    ));
   }
 
+  // Create a file at the destination path to write the ZIP file
   let file = File::create(dest_path)?;
   let mut zip = ZipWriter::new(file);
-  let options = FileOptions::default().compression_method(zip::CompressionMethod::Deflated);
 
-  for entry in WalkDir::new(&src_path) {
-    let entry = entry?;
+  // Traverse through the source directory recursively
+  for entry in WalkDir::new(src_path).into_iter().filter_map(|e| e.ok()) {
     let path = entry.path();
-    let name = match path.strip_prefix(&src_path) {
-      Ok(n) => n,
-      Err(_) => return Err(io::Error::new(io::ErrorKind::Other, "Invalid path")),
-    };
+    let name = path
+      .strip_prefix(src_path)
+      .map_err(|_| io::Error::new(io::ErrorKind::Other, "Invalid path"))?;
 
+    // If the entry is a file, add it to the ZIP archive
     if path.is_file() {
-      zip.start_file(
-        name
-          .to_str()
-          .ok_or_else(|| io::Error::new(io::ErrorKind::Other, "Invalid file name"))?,
-        options,
+      let file_name = name
+        .to_str()
+        .ok_or_else(|| io::Error::new(io::ErrorKind::Other, "Invalid file name"))?;
+      zip.start_file::<_, ()>(
+        file_name,
+        FileOptions::default().compression_method(CompressionMethod::Deflated),
       )?;
+
+      // Instead of loading the entire file into memory, use `copy` for efficient writing
       let mut f = File::open(path)?;
       io::copy(&mut f, &mut zip)?;
-    } else if !name.as_os_str().is_empty() {
-      zip.add_directory(
-        name
-          .to_str()
-          .ok_or_else(|| io::Error::new(io::ErrorKind::Other, "Invalid directory name"))?,
-        options,
-      )?;
+
+      // If the entry is a directory, add it to the ZIP archive
+    } else if path.is_dir() {
+      let dir_name = name
+        .to_str()
+        .ok_or_else(|| io::Error::new(io::ErrorKind::Other, "Invalid directory name"))?;
+      if !dir_name.is_empty() {
+        zip.add_directory::<_, ()>(
+          dir_name,
+          FileOptions::default().compression_method(CompressionMethod::Deflated),
+        )?;
+      }
     }
   }
+
+  // Finish the ZIP archive
   zip.finish()?;
   Ok(())
 }
-
 pub fn unzip_and_replace(
   zip_path: impl AsRef<Path>,
   target_folder: &Path,
@@ -120,7 +138,7 @@ pub fn unzip_and_replace(
 
   // Unzip the file
   let file = File::open(zip_path.as_ref())
-    .context(format!("Can't find the zip file: {:?}", zip_path.as_ref()))?;
+    .with_context(|| format!("Can't find the zip file: {:?}", zip_path.as_ref()))?;
   let mut archive = ZipArchive::new(file).context("Unzip file fail")?;
 
   for i in 0..archive.len() {
@@ -143,14 +161,43 @@ pub fn unzip_and_replace(
   // Replace the contents of the target folder
   if target_folder.exists() {
     fs::remove_dir_all(target_folder)
-      .context(format!("Remove all files in {:?}", target_folder))?;
+      .with_context(|| format!("Remove all files in {:?}", target_folder))?;
   }
 
   fs::create_dir_all(target_folder)?;
   for entry in fs::read_dir(temp_dir.path())? {
     let entry = entry?;
-    fs::rename(entry.path(), target_folder.join(entry.file_name()))?;
+    let target_file = target_folder.join(entry.file_name());
+
+    // Use a copy and delete approach instead of fs::rename
+    if entry.path().is_dir() {
+      // Recursively copy directory contents
+      copy_dir_all(entry.path(), &target_file)?;
+    } else {
+      fs::copy(entry.path(), &target_file)?;
+    }
+    // Remove the original file/directory after copying
+    if entry.path().is_dir() {
+      fs::remove_dir_all(entry.path())?;
+    } else {
+      fs::remove_file(entry.path())?;
+    }
   }
 
+  Ok(())
+}
+
+// Helper function for recursively copying directories
+fn copy_dir_all(src: PathBuf, dst: &Path) -> io::Result<()> {
+  fs::create_dir_all(dst)?;
+  for entry in fs::read_dir(src)? {
+    let entry = entry?;
+    let ty = entry.file_type()?;
+    if ty.is_dir() {
+      copy_dir_all(entry.path(), &dst.join(entry.file_name()))?;
+    } else {
+      fs::copy(entry.path(), dst.join(entry.file_name()))?;
+    }
+  }
   Ok(())
 }

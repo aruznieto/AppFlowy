@@ -8,7 +8,7 @@ use flowy_document::entities::{DocumentSnapshotData, DocumentSnapshotMeta};
 use flowy_document::manager::{DocumentManager, DocumentSnapshotService, DocumentUserService};
 use flowy_document_pub::cloud::DocumentCloudService;
 use flowy_error::{FlowyError, FlowyResult};
-use flowy_storage::ObjectStorageService;
+use flowy_storage_pub::storage::StorageService;
 use flowy_user::services::authenticate_user::AuthenticateUser;
 
 pub struct DocumentDepsResolver();
@@ -18,7 +18,7 @@ impl DocumentDepsResolver {
     _database_manager: &Arc<DatabaseManager>,
     collab_builder: Arc<AppFlowyCollabBuilder>,
     cloud_service: Arc<dyn DocumentCloudService>,
-    storage_service: Weak<dyn ObjectStorageService>,
+    storage_service: Weak<dyn StorageService>,
   ) -> Arc<DocumentManager> {
     let user_service: Arc<dyn DocumentUserService> =
       Arc::new(DocumentUserImpl(authenticate_user.clone()));
@@ -87,6 +87,14 @@ impl DocumentUserService for DocumentUserImpl {
       .upgrade()
       .ok_or(FlowyError::internal().with_context("Unexpected error: UserSession is None"))?
       .user_id()
+  }
+
+  fn device_id(&self) -> Result<String, FlowyError> {
+    self
+      .0
+      .upgrade()
+      .ok_or(FlowyError::internal().with_context("Unexpected error: UserSession is None"))?
+      .device_id()
   }
 
   fn workspace_id(&self) -> Result<String, FlowyError> {
