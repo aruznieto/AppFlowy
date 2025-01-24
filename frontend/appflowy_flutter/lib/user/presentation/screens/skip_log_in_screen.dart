@@ -1,5 +1,3 @@
-import 'package:flutter/material.dart';
-
 import 'package:appflowy/core/frameless_window.dart';
 import 'package:appflowy/core/helpers/url_launcher.dart';
 import 'package:appflowy/generated/flowy_svgs.g.dart';
@@ -10,15 +8,14 @@ import 'package:appflowy/user/application/auth/auth_service.dart';
 import 'package:appflowy/user/presentation/router.dart';
 import 'package:appflowy/user/presentation/widgets/widgets.dart';
 import 'package:appflowy/workspace/application/settings/appearance/appearance_cubit.dart';
-import 'package:appflowy/workspace/presentation/settings/widgets/settings_language_view.dart';
 import 'package:appflowy_backend/log.dart';
-import 'package:appflowy_editor/appflowy_editor.dart' hide Log;
-import 'package:appflowy_popover/appflowy_popover.dart';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flowy_infra/language.dart';
 import 'package:flowy_infra/size.dart';
 import 'package:flowy_infra_ui/flowy_infra_ui.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:universal_platform/universal_platform.dart';
 
 class SkipLogInScreen extends StatefulWidget {
   const SkipLogInScreen({super.key});
@@ -36,9 +33,7 @@ class _SkipLogInScreenState extends State<SkipLogInScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: const _SkipLoginMoveWindow(),
-      body: Center(
-        child: _renderBody(context),
-      ),
+      body: Center(child: _renderBody(context)),
     );
   }
 
@@ -50,7 +45,7 @@ class _SkipLogInScreenState extends State<SkipLogInScreen> {
         const Spacer(),
         FlowyLogoTitle(
           title: LocaleKeys.welcomeText.tr(),
-          logoSize: Size.square(PlatformExtension.isMobile ? 80 : 40),
+          logoSize: Size.square(UniversalPlatform.isMobile ? 80 : 40),
         ),
         const VSpace(32),
         GoButton(
@@ -73,9 +68,7 @@ class _SkipLogInScreenState extends State<SkipLogInScreen> {
         SizedBox(
           width: size.width * 0.7,
           child: FolderWidget(
-            createFolderCallback: () async {
-              _didCustomizeFolder = true;
-            },
+            createFolderCallback: () async => _didCustomizeFolder = true,
           ),
         ),
         const Spacer(),
@@ -88,24 +81,16 @@ class _SkipLogInScreenState extends State<SkipLogInScreen> {
   Future<void> _autoRegister(BuildContext context) async {
     final result = await getIt<AuthService>().signUpAsGuest();
     result.fold(
-      (user) {
-        getIt<AuthRouter>().goHomeScreen(context, user);
-      },
-      (error) {
-        Log.error(error);
-      },
+      (user) => getIt<AuthRouter>().goHomeScreen(context, user),
+      (error) => Log.error(error),
     );
   }
 
-  Future<void> _relaunchAppAndAutoRegister() async {
-    await runAppFlowy(isAnon: true);
-  }
+  Future<void> _relaunchAppAndAutoRegister() async => runAppFlowy(isAnon: true);
 }
 
 class SkipLoginPageFooter extends StatelessWidget {
-  const SkipLoginPageFooter({
-    super.key,
-  });
+  const SkipLoginPageFooter({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -116,7 +101,7 @@ class SkipLoginPageFooter extends StatelessWidget {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          if (!PlatformExtension.isMobile) const HSpace(placeholderWidth),
+          if (!UniversalPlatform.isMobile) const HSpace(placeholderWidth),
           const Expanded(child: SubscribeButtons()),
           const SizedBox(
             width: placeholderWidth,
@@ -135,9 +120,7 @@ class SkipLoginPageFooter extends StatelessWidget {
 }
 
 class SubscribeButtons extends StatelessWidget {
-  const SubscribeButtons({
-    super.key,
-  });
+  const SubscribeButtons({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -168,10 +151,7 @@ class SubscribeButtons extends StatelessWidget {
           mainAxisAlignment: MainAxisAlignment.center,
           mainAxisSize: MainAxisSize.min,
           children: [
-            FlowyText.regular(
-              LocaleKeys.and.tr(),
-              fontSize: FontSizes.s12,
-            ),
+            FlowyText.regular(LocaleKeys.and.tr(), fontSize: FontSizes.s12),
             FlowyTextButton(
               LocaleKeys.subscribeNewsletterText.tr(),
               padding: const EdgeInsets.symmetric(horizontal: 4.0),
@@ -190,9 +170,7 @@ class SubscribeButtons extends StatelessWidget {
 }
 
 class LanguageSelectorOnWelcomePage extends StatelessWidget {
-  const LanguageSelectorOnWelcomePage({
-    super.key,
-  });
+  const LanguageSelectorOnWelcomePage({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -205,24 +183,16 @@ class LanguageSelectorOnWelcomePage extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           mainAxisAlignment: MainAxisAlignment.end,
           children: [
-            const FlowySvg(
-              FlowySvgs.ethernet_m,
-              size: Size.square(20),
-            ),
+            const FlowySvg(FlowySvgs.ethernet_m, size: Size.square(20)),
             const HSpace(4),
             Builder(
               builder: (context) {
                 final currentLocale =
                     context.watch<AppearanceSettingsCubit>().state.locale;
-                return FlowyText(
-                  languageFromLocale(currentLocale),
-                );
+                return FlowyText(languageFromLocale(currentLocale));
               },
             ),
-            const FlowySvg(
-              FlowySvgs.drop_menu_hide_m,
-              size: Size.square(20),
-            ),
+            const FlowySvg(FlowySvgs.drop_menu_hide_m, size: Size.square(20)),
           ],
         ),
       ),
@@ -231,11 +201,64 @@ class LanguageSelectorOnWelcomePage extends StatelessWidget {
         if (easyLocalization == null) {
           return const SizedBox.shrink();
         }
-        final allLocales = easyLocalization.supportedLocales;
+
         return LanguageItemsListView(
-          allLocales: allLocales,
+          allLocales: easyLocalization.supportedLocales,
         );
       },
+    );
+  }
+}
+
+class LanguageItemsListView extends StatelessWidget {
+  const LanguageItemsListView({super.key, required this.allLocales});
+
+  final List<Locale> allLocales;
+
+  @override
+  Widget build(BuildContext context) {
+    // get current locale from cubit
+    final state = context.watch<AppearanceSettingsCubit>().state;
+    return ConstrainedBox(
+      constraints: const BoxConstraints(maxHeight: 400),
+      child: ListView.builder(
+        itemCount: allLocales.length,
+        itemBuilder: (context, index) {
+          final locale = allLocales[index];
+          return LanguageItem(locale: locale, currentLocale: state.locale);
+        },
+      ),
+    );
+  }
+}
+
+class LanguageItem extends StatelessWidget {
+  const LanguageItem({
+    super.key,
+    required this.locale,
+    required this.currentLocale,
+  });
+
+  final Locale locale;
+  final Locale currentLocale;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: 32,
+      child: FlowyButton(
+        text: FlowyText.medium(
+          languageFromLocale(locale),
+        ),
+        rightIcon:
+            currentLocale == locale ? const FlowySvg(FlowySvgs.check_s) : null,
+        onTap: () {
+          if (currentLocale != locale) {
+            context.read<AppearanceSettingsCubit>().setLocale(context, locale);
+          }
+          PopoverContainer.of(context).close();
+        },
+      ),
     );
   }
 }
@@ -248,10 +271,7 @@ class GoButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return BlocProvider(
-      create: (context) => AnonUserBloc()
-        ..add(
-          const AnonUserEvent.initial(),
-        ),
+      create: (context) => AnonUserBloc()..add(const AnonUserEvent.initial()),
       child: BlocListener<AnonUserBloc, AnonUserState>(
         listener: (context, state) async {
           if (state.openedAnonUser != null) {
@@ -265,7 +285,6 @@ class GoButton extends StatelessWidget {
                 : LocaleKeys.signIn_continueAnonymousUser.tr();
 
             final textWidget = Row(
-              // mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Expanded(
                   child: FlowyText.medium(
@@ -274,22 +293,6 @@ class GoButton extends StatelessWidget {
                     fontSize: 14,
                   ),
                 ),
-                // Tooltip(
-                //   message: LocaleKeys.settings_menu_configServerGuide.tr(),
-                //   child: Container(
-                //     width: 30.0,
-                //     decoration: const BoxDecoration(
-                //       shape: BoxShape.circle,
-                //     ),
-                //     child: Center(
-                //       child: Icon(
-                //         Icons.help,
-                //         color: Colors.white,
-                //         weight: 2,
-                //       ),
-                //     ),
-                //   ),
-                // ),
               ],
             );
 
@@ -325,15 +328,8 @@ class _SkipLoginMoveWindow extends StatelessWidget
   const _SkipLoginMoveWindow();
 
   @override
-  Widget build(BuildContext context) {
-    return const Row(
-      children: [
-        Expanded(
-          child: MoveWindowDetector(),
-        ),
-      ],
-    );
-  }
+  Widget build(BuildContext context) =>
+      const Row(children: [Expanded(child: MoveWindowDetector())]);
 
   @override
   Size get preferredSize => const Size.fromHeight(55.0);

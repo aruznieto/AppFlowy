@@ -1,5 +1,6 @@
-import 'package:flowy_infra_ui/style_widget/hover.dart';
 import 'package:flutter/material.dart';
+
+import 'package:flowy_infra_ui/style_widget/hover.dart';
 
 enum AccessoryType {
   edit,
@@ -10,10 +11,6 @@ abstract mixin class CardAccessory implements Widget {
   AccessoryType get type;
   void onTap(BuildContext context) {}
 }
-
-typedef CardAccessoryBuilder = List<CardAccessory> Function(
-  BuildContext buildContext,
-);
 
 class CardAccessoryContainer extends StatelessWidget {
   const CardAccessoryContainer({
@@ -27,6 +24,10 @@ class CardAccessoryContainer extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (accessories.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
     final children = accessories.map<Widget>((accessory) {
       return GestureDetector(
         behavior: HitTestBehavior.opaque,

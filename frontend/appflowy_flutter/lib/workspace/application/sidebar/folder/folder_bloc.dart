@@ -3,19 +3,34 @@ import 'dart:convert';
 import 'package:appflowy/core/config/kv.dart';
 import 'package:appflowy/core/config/kv_keys.dart';
 import 'package:appflowy/startup/startup.dart';
+import 'package:appflowy_backend/protobuf/flowy-folder/view.pb.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:freezed_annotation/freezed_annotation.dart';
 
 part 'folder_bloc.freezed.dart';
 
-enum FolderCategoryType {
+enum FolderSpaceType {
   favorite,
-  personal,
+  private,
+  public,
+  unknown;
+
+  ViewSectionPB get toViewSectionPB {
+    switch (this) {
+      case FolderSpaceType.private:
+        return ViewSectionPB.Private;
+      case FolderSpaceType.public:
+        return ViewSectionPB.Public;
+      case FolderSpaceType.favorite:
+      case FolderSpaceType.unknown:
+        throw UnimplementedError();
+    }
+  }
 }
 
 class FolderBloc extends Bloc<FolderEvent, FolderState> {
   FolderBloc({
-    required FolderCategoryType type,
+    required FolderSpaceType type,
   }) : super(FolderState.initial(type)) {
     on<FolderEvent>((event, emit) async {
       await event.map(
@@ -26,7 +41,7 @@ class FolderBloc extends Bloc<FolderEvent, FolderState> {
         },
         expandOrUnExpand: (e) async {
           final isExpanded = e.isExpanded ?? !state.isExpanded;
-          await _setFolderExpandStatus(e.isExpanded ?? !state.isExpanded);
+          await _setFolderExpandStatus(isExpanded);
           emit(state.copyWith(isExpanded: isExpanded));
         },
       );
@@ -71,12 +86,12 @@ class FolderEvent with _$FolderEvent {
 @freezed
 class FolderState with _$FolderState {
   const factory FolderState({
-    required FolderCategoryType type,
+    required FolderSpaceType type,
     required bool isExpanded,
   }) = _FolderState;
 
   factory FolderState.initial(
-    FolderCategoryType type,
+    FolderSpaceType type,
   ) =>
       FolderState(
         type: type,

@@ -1,6 +1,4 @@
-import 'package:appflowy/generated/locale_keys.g.dart';
 import 'package:appflowy_editor/appflowy_editor.dart';
-import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
 
@@ -14,15 +12,14 @@ void main() {
         (tester) async {
       await tester.initializeAppFlowy();
 
-      await tester.tapGoButton();
+      await tester.tapAnonymousSignInButton();
 
       // create a new document
-      await tester.createNewPageWithNameUnderParent();
+      const pageName = 'Test Document';
+      await tester.createNewPageWithNameUnderParent(name: pageName);
 
       // expect to see a new document
-      tester.expectToSeePageName(
-        LocaleKeys.menuAppHeader_defaultNewPageName.tr(),
-      );
+      tester.expectToSeePageName(pageName);
       // and with one paragraph block
       expect(find.byType(ParagraphBlockComponentWidget), findsOneWidget);
     });
@@ -30,7 +27,7 @@ void main() {
     testWidgets('delete the readme page and restore it', (tester) async {
       await tester.initializeAppFlowy();
 
-      await tester.tapGoButton();
+      await tester.tapAnonymousSignInButton();
 
       // delete the readme page
       await tester.hoverOnPageName(
@@ -54,7 +51,7 @@ void main() {
         (tester) async {
       await tester.initializeAppFlowy();
 
-      await tester.tapGoButton();
+      await tester.tapAnonymousSignInButton();
 
       // delete the readme page
       await tester.hoverOnPageName(

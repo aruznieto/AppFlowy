@@ -1,22 +1,19 @@
 use std::cmp::Ordering;
 use std::str::FromStr;
 
-use collab_database::fields::{Field, TypeOptionData, TypeOptionDataBuilder};
+use collab_database::fields::checkbox_type_option::CheckboxTypeOption;
+use collab_database::fields::Field;
 use collab_database::rows::Cell;
-use serde::{Deserialize, Serialize};
-
+use collab_database::template::util::ToCellString;
 use flowy_error::FlowyResult;
 
 use crate::entities::{CheckboxCellDataPB, CheckboxFilterPB, FieldType};
 use crate::services::cell::{CellDataChangeset, CellDataDecoder};
 use crate::services::field::{
-  TypeOption, TypeOptionCellDataCompare, TypeOptionCellDataFilter, TypeOptionCellDataSerde,
+  CellDataProtobufEncoder, TypeOption, TypeOptionCellDataCompare, TypeOptionCellDataFilter,
   TypeOptionTransform,
 };
 use crate::services::sort::SortCondition;
-
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
-pub struct CheckboxTypeOption();
 
 impl TypeOption for CheckboxTypeOption {
   type CellData = CheckboxCellDataPB;
@@ -25,85 +22,33 @@ impl TypeOption for CheckboxTypeOption {
   type CellFilter = CheckboxFilterPB;
 }
 
-impl TypeOptionTransform for CheckboxTypeOption {
-  fn transformable(&self) -> bool {
-    true
-  }
+impl TypeOptionTransform for CheckboxTypeOption {}
 
-  fn transform_type_option(
-    &mut self,
-    _old_type_option_field_type: FieldType,
-    _old_type_option_data: TypeOptionData,
-  ) {
-  }
-
-  fn transform_type_option_cell(
-    &self,
-    cell: &Cell,
-    transformed_field_type: &FieldType,
-    _field: &Field,
-  ) -> Option<<Self as TypeOption>::CellData> {
-    if transformed_field_type.is_text() {
-      Some(CheckboxCellDataPB::from(cell))
-    } else {
-      None
-    }
-  }
-}
-
-impl From<TypeOptionData> for CheckboxTypeOption {
-  fn from(_data: TypeOptionData) -> Self {
-    Self()
-  }
-}
-
-impl From<CheckboxTypeOption> for TypeOptionData {
-  fn from(_data: CheckboxTypeOption) -> Self {
-    TypeOptionDataBuilder::new().build()
-  }
-}
-
-impl TypeOptionCellDataSerde for CheckboxTypeOption {
+impl CellDataProtobufEncoder for CheckboxTypeOption {
   fn protobuf_encode(
     &self,
     cell_data: <Self as TypeOption>::CellData,
   ) -> <Self as TypeOption>::CellProtobufType {
     cell_data
   }
-
-  fn parse_cell(&self, cell: &Cell) -> FlowyResult<<Self as TypeOption>::CellData> {
-    Ok(CheckboxCellDataPB::from(cell))
-  }
 }
 
 impl CellDataDecoder for CheckboxTypeOption {
-  fn decode_cell(
+  fn decode_cell_with_transform(
     &self,
     cell: &Cell,
-    decoded_field_type: &FieldType,
+    from_field_type: FieldType,
     _field: &Field,
-  ) -> FlowyResult<<Self as TypeOption>::CellData> {
-    if !decoded_field_type.is_checkbox() {
-      return Ok(Default::default());
+  ) -> Option<<Self as TypeOption>::CellData> {
+    if from_field_type.is_text() {
+      Some(CheckboxCellDataPB::from(cell))
+    } else {
+      None
     }
-    self.parse_cell(cell)
   }
 
   fn stringify_cell_data(&self, cell_data: <Self as TypeOption>::CellData) -> String {
-    cell_data.to_string()
-  }
-
-  fn stringify_cell(&self, cell: &Cell) -> String {
-    Self::CellData::from(cell).to_string()
-  }
-
-  fn numeric_cell(&self, cell: &Cell) -> Option<f64> {
-    let cell_data = self.parse_cell(cell).ok()?;
-    if cell_data.is_checked {
-      Some(1.0)
-    } else {
-      Some(0.0)
-    }
+    cell_data.to_cell_string()
   }
 }
 

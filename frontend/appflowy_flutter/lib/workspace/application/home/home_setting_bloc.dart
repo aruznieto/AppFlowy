@@ -15,7 +15,7 @@ class HomeSettingBloc extends Bloc<HomeSettingEvent, HomeSettingState> {
     WorkspaceSettingPB workspaceSetting,
     AppearanceSettingsCubit appearanceSettingsCubit,
     double screenWidthPx,
-  )   : _listener = UserWorkspaceListener(),
+  )   : _listener = FolderListener(),
         _appearanceSettingsCubit = appearanceSettingsCubit,
         super(
           HomeSettingState.initial(
@@ -27,7 +27,7 @@ class HomeSettingBloc extends Bloc<HomeSettingEvent, HomeSettingState> {
     _dispatch();
   }
 
-  final UserWorkspaceListener _listener;
+  final FolderListener _listener;
   final AppearanceSettingsCubit _appearanceSettingsCubit;
 
   @override
@@ -86,7 +86,7 @@ class HomeSettingBloc extends Bloc<HomeSettingEvent, HomeSettingState> {
           },
           editPanelResized: (_EditPanelResized e) {
             final newPosition =
-                (e.offset + state.resizeStart).clamp(-50, 200).toDouble();
+                (state.resizeStart + e.offset).clamp(0, 200).toDouble();
             if (state.resizeOffset != newPosition) {
               emit(state.copyWith(resizeOffset: newPosition));
             }

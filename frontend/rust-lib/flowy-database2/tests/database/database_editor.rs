@@ -1,25 +1,24 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use collab_database::database::{gen_database_view_id, timestamp};
+use collab_database::database::gen_database_view_id;
+use collab_database::fields::checkbox_type_option::CheckboxTypeOption;
+use collab_database::fields::checklist_type_option::ChecklistTypeOption;
+use collab_database::fields::select_type_option::{
+  MultiSelectTypeOption, SelectOption, SingleSelectTypeOption,
+};
 use collab_database::fields::Field;
-use collab_database::rows::{CreateRowParams, RowDetail, RowId};
-use collab_database::views::OrderObjectPosition;
+use collab_database::rows::{Row, RowId};
 use lib_infra::box_any::BoxAny;
 use strum::EnumCount;
 
-use event_integration::folder_event::ViewTest;
-use event_integration::EventIntegrationTest;
-use flowy_database2::entities::{FieldType, FilterPB, RowMetaPB};
-use flowy_database2::services::cell::CellBuilder;
+use event_integration_test::folder_event::ViewTest;
+use event_integration_test::EventIntegrationTest;
+use flowy_database2::entities::{DatabasePB, FieldType, FilterPB, RowMetaPB};
+
 use flowy_database2::services::database::DatabaseEditor;
-use flowy_database2::services::field::checklist_type_option::{
-  ChecklistCellChangeset, ChecklistTypeOption,
-};
-use flowy_database2::services::field::{
-  CheckboxTypeOption, MultiSelectTypeOption, SelectOption, SelectOptionCellChangeset,
-  SingleSelectTypeOption,
-};
+use flowy_database2::services::field::checklist_filter::ChecklistCellChangeset;
+use flowy_database2::services::field::SelectOptionCellChangeset;
 use flowy_database2::services::share::csv::{CSVFormat, ImportResult};
 use flowy_error::FlowyResult;
 
@@ -32,7 +31,7 @@ pub struct DatabaseEditorTest {
   pub view_id: String,
   pub editor: Arc<DatabaseEditor>,
   pub fields: Vec<Arc<Field>>,
-  pub row_details: Vec<Arc<RowDetail>>,
+  pub rows: Vec<Arc<Row>>,
   pub field_count: usize,
   pub row_by_row_id: HashMap<String, RowMetaPB>,
 }
@@ -77,45 +76,54 @@ impl DatabaseEditorTest {
   pub async fn new(sdk: EventIntegrationTest, test: ViewTest) -> Self {
     let editor = sdk
       .database_manager
-      .get_database_with_view_id(&test.child_view.id)
+      .get_database_editor_with_view_id(&test.child_view.id)
       .await
       .unwrap();
     let fields = editor
       .get_fields(&test.child_view.id, None)
+      .await
       .into_iter()
       .map(Arc::new)
       .collect();
     let rows = editor
-      .get_rows(&test.child_view.id)
+      .get_all_rows(&test.child_view.id)
       .await
       .unwrap()
       .into_iter()
       .collect();
 
     let view_id = test.child_view.id;
-    Self {
+    let this = Self {
       sdk,
-      view_id,
+      view_id: view_id.clone(),
       editor,
       fields,
-      row_details: rows,
+      rows,
       field_count: FieldType::COUNT,
       row_by_row_id: HashMap::default(),
-    }
+    };
+    this.get_database_data(&view_id).await;
+    this
   }
 
+  pub async fn get_database_data(&self, view_id: &str) -> DatabasePB {
+    self.editor.open_database_view(view_id, None).await.unwrap()
+  }
+
+  #[allow(dead_code)]
   pub async fn database_filters(&self) -> Vec<FilterPB> {
     self.editor.get_all_filters(&self.view_id).await.items
   }
 
-  pub async fn get_rows(&self) -> Vec<Arc<RowDetail>> {
-    self.editor.get_rows(&self.view_id).await.unwrap()
+  pub async fn get_rows(&self) -> Vec<Arc<Row>> {
+    self.editor.get_all_rows(&self.view_id).await.unwrap()
   }
 
-  pub fn get_field(&self, field_id: &str, field_type: FieldType) -> Field {
+  pub async fn get_field(&self, field_id: &str, field_type: FieldType) -> Field {
     self
       .editor
       .get_fields(&self.view_id, None)
+      .await
       .into_iter()
       .filter(|field| {
         let t_field_type = FieldType::from(field.field_type);
@@ -128,10 +136,11 @@ impl DatabaseEditorTest {
 
   /// returns the first `Field` in the build-in test grid.
   /// Not support duplicate `FieldType` in test grid yet.
-  pub fn get_first_field(&self, field_type: FieldType) -> Field {
+  pub async fn get_first_field(&self, field_type: FieldType) -> Field {
     self
       .editor
       .get_fields(&self.view_id, None)
+      .await
       .into_iter()
       .filter(|field| {
         let t_field_type = FieldType::from(field.field_type);
@@ -142,47 +151,50 @@ impl DatabaseEditorTest {
       .unwrap()
   }
 
-  pub fn get_fields(&self) -> Vec<Field> {
-    self.editor.get_fields(&self.view_id, None)
+  pub async fn get_fields(&self) -> Vec<Field> {
+    self.editor.get_fields(&self.view_id, None).await
   }
 
-  pub fn get_multi_select_type_option(&self, field_id: &str) -> Vec<SelectOption> {
+  pub async fn get_multi_select_type_option(&self, field_id: &str) -> Vec<SelectOption> {
     let field_type = FieldType::MultiSelect;
-    let field = self.get_field(field_id, field_type);
+    let field = self.get_field(field_id, field_type).await;
     let type_option = field
       .get_type_option::<MultiSelectTypeOption>(field_type)
-      .unwrap();
+      .unwrap()
+      .0;
     type_option.options
   }
 
-  pub fn get_single_select_type_option(&self, field_id: &str) -> SingleSelectTypeOption {
+  pub async fn get_single_select_type_option(&self, field_id: &str) -> Vec<SelectOption> {
     let field_type = FieldType::SingleSelect;
-    let field = self.get_field(field_id, field_type);
-    field
+    let field = self.get_field(field_id, field_type).await;
+    let type_option = field
       .get_type_option::<SingleSelectTypeOption>(field_type)
       .unwrap()
+      .0;
+    type_option.options
   }
 
   #[allow(dead_code)]
-  pub fn get_checklist_type_option(&self, field_id: &str) -> ChecklistTypeOption {
+  pub async fn get_checklist_type_option(&self, field_id: &str) -> ChecklistTypeOption {
     let field_type = FieldType::Checklist;
-    let field = self.get_field(field_id, field_type);
+    let field = self.get_field(field_id, field_type).await;
     field
       .get_type_option::<ChecklistTypeOption>(field_type)
       .unwrap()
   }
 
   #[allow(dead_code)]
-  pub fn get_checkbox_type_option(&self, field_id: &str) -> CheckboxTypeOption {
+  pub async fn get_checkbox_type_option(&self, field_id: &str) -> CheckboxTypeOption {
     let field_type = FieldType::Checkbox;
-    let field = self.get_field(field_id, field_type);
+    let field = self.get_field(field_id, field_type).await;
     field
       .get_type_option::<CheckboxTypeOption>(field_type)
       .unwrap()
   }
 
   pub async fn update_cell(
-    &mut self,
+    &self,
     field_id: &str,
     row_id: RowId,
     cell_changeset: BoxAny,
@@ -190,13 +202,14 @@ impl DatabaseEditorTest {
     let field = self
       .editor
       .get_fields(&self.view_id, None)
+      .await
       .into_iter()
       .find(|field| field.id == field_id)
       .unwrap();
 
     self
       .editor
-      .update_cell_with_changeset(&self.view_id, row_id, &field.id, cell_changeset)
+      .update_cell_with_changeset(&self.view_id, &row_id, &field.id, cell_changeset)
       .await
   }
 
@@ -204,6 +217,7 @@ impl DatabaseEditorTest {
     let field = self
       .editor
       .get_fields(&self.view_id, None)
+      .await
       .iter()
       .find(|field| {
         let field_type = FieldType::from(field.field_type);
@@ -225,6 +239,7 @@ impl DatabaseEditorTest {
     let field = self
       .editor
       .get_fields(&self.view_id, None)
+      .await
       .iter()
       .find(|field| {
         let field_type = FieldType::from(field.field_type);
@@ -233,7 +248,7 @@ impl DatabaseEditorTest {
       .unwrap()
       .clone();
     let cell_changeset = ChecklistCellChangeset {
-      selected_option_ids: selected_options,
+      completed_task_ids: selected_options,
       ..Default::default()
     };
     self
@@ -250,6 +265,7 @@ impl DatabaseEditorTest {
     let field = self
       .editor
       .get_fields(&self.view_id, None)
+      .await
       .iter()
       .find(|field| {
         let field_type = FieldType::from(field.field_type);
@@ -277,140 +293,8 @@ impl DatabaseEditorTest {
     self
       .sdk
       .database_manager
-      .get_database(database_id)
+      .get_or_init_database_editor(database_id)
       .await
       .ok()
-  }
-}
-
-pub struct TestRowBuilder<'a> {
-  row_id: RowId,
-  fields: &'a [Field],
-  cell_build: CellBuilder<'a>,
-}
-
-impl<'a> TestRowBuilder<'a> {
-  pub fn new(row_id: RowId, fields: &'a [Field]) -> Self {
-    let cell_build = CellBuilder::with_cells(Default::default(), fields);
-    Self {
-      row_id,
-      fields,
-      cell_build,
-    }
-  }
-
-  pub fn insert_text_cell(&mut self, data: &str) -> String {
-    let text_field = self.field_with_type(&FieldType::RichText);
-    self
-      .cell_build
-      .insert_text_cell(&text_field.id, data.to_string());
-
-    text_field.id.clone()
-  }
-
-  pub fn insert_number_cell(&mut self, data: &str) -> String {
-    let number_field = self.field_with_type(&FieldType::Number);
-    self
-      .cell_build
-      .insert_text_cell(&number_field.id, data.to_string());
-    number_field.id.clone()
-  }
-
-  pub fn insert_date_cell(
-    &mut self,
-    date: i64,
-    time: Option<String>,
-    include_time: Option<bool>,
-    field_type: &FieldType,
-  ) -> String {
-    let date_field = self.field_with_type(field_type);
-    self
-      .cell_build
-      .insert_date_cell(&date_field.id, date, time, include_time);
-    date_field.id.clone()
-  }
-
-  pub fn insert_checkbox_cell(&mut self, data: &str) -> String {
-    let checkbox_field = self.field_with_type(&FieldType::Checkbox);
-    self
-      .cell_build
-      .insert_text_cell(&checkbox_field.id, data.to_string());
-
-    checkbox_field.id.clone()
-  }
-
-  pub fn insert_url_cell(&mut self, content: &str) -> String {
-    let url_field = self.field_with_type(&FieldType::URL);
-    self
-      .cell_build
-      .insert_url_cell(&url_field.id, content.to_string());
-    url_field.id.clone()
-  }
-
-  pub fn insert_single_select_cell<F>(&mut self, f: F) -> String
-  where
-    F: Fn(Vec<SelectOption>) -> SelectOption,
-  {
-    let single_select_field = self.field_with_type(&FieldType::SingleSelect);
-    let type_option = single_select_field
-      .get_type_option::<SingleSelectTypeOption>(FieldType::SingleSelect)
-      .unwrap();
-    let option = f(type_option.options);
-    self
-      .cell_build
-      .insert_select_option_cell(&single_select_field.id, vec![option.id]);
-
-    single_select_field.id.clone()
-  }
-
-  pub fn insert_multi_select_cell<F>(&mut self, f: F) -> String
-  where
-    F: Fn(Vec<SelectOption>) -> Vec<SelectOption>,
-  {
-    let multi_select_field = self.field_with_type(&FieldType::MultiSelect);
-    let type_option = multi_select_field
-      .get_type_option::<MultiSelectTypeOption>(FieldType::MultiSelect)
-      .unwrap();
-    let options = f(type_option.options);
-    let ops_ids = options
-      .iter()
-      .map(|option| option.id.clone())
-      .collect::<Vec<_>>();
-    self
-      .cell_build
-      .insert_select_option_cell(&multi_select_field.id, ops_ids);
-
-    multi_select_field.id.clone()
-  }
-
-  pub fn insert_checklist_cell(&mut self, options: Vec<(String, bool)>) -> String {
-    let checklist_field = self.field_with_type(&FieldType::Checklist);
-    self
-      .cell_build
-      .insert_checklist_cell(&checklist_field.id, options);
-    checklist_field.id.clone()
-  }
-
-  pub fn field_with_type(&self, field_type: &FieldType) -> Field {
-    self
-      .fields
-      .iter()
-      .find(|field| {
-        let t_field_type = FieldType::from(field.field_type);
-        &t_field_type == field_type
-      })
-      .unwrap()
-      .clone()
-  }
-
-  pub fn build(self) -> CreateRowParams {
-    CreateRowParams {
-      id: self.row_id,
-      cells: self.cell_build.build(),
-      height: 60,
-      visibility: true,
-      row_position: OrderObjectPosition::End,
-      timestamp: timestamp(),
-    }
   }
 }

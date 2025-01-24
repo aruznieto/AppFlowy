@@ -29,59 +29,13 @@ class FieldInfo with _$FieldInfo {
 
   String get name => field.name;
 
+  String get icon => field.icon;
+
   bool get isPrimary => field.isPrimary;
+
+  double? get width => fieldSettings?.width.toDouble();
 
   FieldVisibility? get visibility => fieldSettings?.visibility;
 
-  bool get canBeGroup {
-    switch (field.fieldType) {
-      case FieldType.URL:
-      case FieldType.Checkbox:
-      case FieldType.MultiSelect:
-      case FieldType.SingleSelect:
-      case FieldType.DateTime:
-        return true;
-      default:
-        return false;
-    }
-  }
-
-  bool get canCreateFilter {
-    if (hasFilter) {
-      return false;
-    }
-
-    switch (field.fieldType) {
-      case FieldType.Number:
-      case FieldType.Checkbox:
-      case FieldType.MultiSelect:
-      case FieldType.RichText:
-      case FieldType.SingleSelect:
-      case FieldType.Checklist:
-        return true;
-      default:
-        return false;
-    }
-  }
-
-  bool get canCreateSort {
-    if (hasSort) {
-      return false;
-    }
-
-    switch (field.fieldType) {
-      case FieldType.RichText:
-      case FieldType.Checkbox:
-      case FieldType.Number:
-      case FieldType.DateTime:
-      case FieldType.SingleSelect:
-      case FieldType.MultiSelect:
-      case FieldType.LastEditedTime:
-      case FieldType.CreatedTime:
-      case FieldType.Checklist:
-        return true;
-      default:
-        return false;
-    }
-  }
+  bool? get wrapCellContent => fieldSettings?.wrapCellContent;
 }

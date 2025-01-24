@@ -1,21 +1,26 @@
 use collab_database::database::{gen_database_id, gen_database_view_id, gen_row_id, DatabaseData};
-use collab_database::views::{DatabaseLayout, DatabaseView, LayoutSetting, LayoutSettings};
+use collab_database::entity::DatabaseView;
+use collab_database::fields::checklist_type_option::ChecklistTypeOption;
+use collab_database::fields::date_type_option::{DateFormat, DateTypeOption, TimeFormat};
+use collab_database::fields::relation_type_option::RelationTypeOption;
+use collab_database::fields::select_type_option::{
+  MultiSelectTypeOption, SelectOption, SelectOptionColor, SingleSelectTypeOption,
+};
+use collab_database::fields::summary_type_option::SummarizationTypeOption;
+use collab_database::fields::timestamp_type_option::TimestampTypeOption;
+use collab_database::views::{DatabaseLayout, LayoutSetting, LayoutSettings};
 use strum::IntoEnumIterator;
 
+use crate::database::mock_data::{COMPLETED, FACEBOOK, GOOGLE, PAUSED, PLANNED, TWITTER};
+use event_integration_test::database_event::TestRowBuilder;
 use flowy_database2::entities::FieldType;
-use flowy_database2::services::field::checklist_type_option::ChecklistTypeOption;
-use flowy_database2::services::field::{
-  DateFormat, DateTypeOption, FieldBuilder, MultiSelectTypeOption, RelationTypeOption,
-  SelectOption, SelectOptionColor, SingleSelectTypeOption, TimeFormat, TimestampTypeOption,
-};
+use flowy_database2::services::field::FieldBuilder;
 use flowy_database2::services::field_settings::default_field_settings_for_fields;
 use flowy_database2::services::setting::BoardLayoutSetting;
 
-use crate::database::database_editor::TestRowBuilder;
-use crate::database::mock_data::{COMPLETED, FACEBOOK, GOOGLE, PAUSED, PLANNED, TWITTER};
-
 // Kanban board unit test mock data
 pub fn make_test_board() -> DatabaseData {
+  let database_id = gen_database_id();
   let mut fields = vec![];
   let mut rows = vec![];
   // Iterate through the FieldType to create the corresponding Field.
@@ -24,7 +29,6 @@ pub fn make_test_board() -> DatabaseData {
       FieldType::RichText => {
         let text_field = FieldBuilder::from_field_type(field_type)
           .name("Name")
-          .visibility(true)
           .primary(true)
           .build();
         fields.push(text_field);
@@ -33,7 +37,6 @@ pub fn make_test_board() -> DatabaseData {
         // Number
         let number_field = FieldBuilder::from_field_type(field_type)
           .name("Price")
-          .visibility(true)
           .build();
         fields.push(number_field);
       },
@@ -47,7 +50,6 @@ pub fn make_test_board() -> DatabaseData {
         let name = "Time";
         let date_field = FieldBuilder::new(field_type, date_type_option)
           .name(name)
-          .visibility(true)
           .build();
         fields.push(date_field);
       },
@@ -57,7 +59,8 @@ pub fn make_test_board() -> DatabaseData {
           date_format: DateFormat::US,
           time_format: TimeFormat::TwentyFourHour,
           include_time: true,
-          field_type,
+          field_type: field_type.into(),
+          timezone: None,
         };
         let name = match field_type {
           FieldType::LastEditedTime => "Last Modified",
@@ -66,7 +69,6 @@ pub fn make_test_board() -> DatabaseData {
         };
         let date_field = FieldBuilder::new(field_type, date_type_option)
           .name(name)
-          .visibility(true)
           .build();
         fields.push(date_field);
       },
@@ -81,7 +83,6 @@ pub fn make_test_board() -> DatabaseData {
           .extend(vec![option1, option2, option3]);
         let single_select_field = FieldBuilder::new(field_type, single_select_type_option)
           .name("Status")
-          .visibility(true)
           .build();
         fields.push(single_select_field);
       },
@@ -94,7 +95,6 @@ pub fn make_test_board() -> DatabaseData {
         type_option.options.extend(vec![option1, option2, option3]);
         let multi_select_field = FieldBuilder::new(field_type, type_option)
           .name("Platform")
-          .visibility(true)
           .build();
         fields.push(multi_select_field);
       },
@@ -102,7 +102,6 @@ pub fn make_test_board() -> DatabaseData {
         // Checkbox
         let checkbox_field = FieldBuilder::from_field_type(field_type)
           .name("is urgent")
-          .visibility(true)
           .build();
         fields.push(checkbox_field);
       },
@@ -110,7 +109,6 @@ pub fn make_test_board() -> DatabaseData {
         // URL
         let url = FieldBuilder::from_field_type(field_type)
           .name("link")
-          .visibility(true)
           .build();
         fields.push(url);
       },
@@ -122,7 +120,6 @@ pub fn make_test_board() -> DatabaseData {
         // type_option.options.extend(vec![option1, option2, option3]);
         let checklist_field = FieldBuilder::new(field_type, type_option)
           .name("TODO")
-          .visibility(true)
           .build();
         fields.push(checklist_field);
       },
@@ -132,10 +129,23 @@ pub fn make_test_board() -> DatabaseData {
         };
         let relation_field = FieldBuilder::new(field_type, type_option)
           .name("Related")
-          .visibility(true)
           .build();
         fields.push(relation_field);
       },
+      FieldType::Summary => {
+        let type_option = SummarizationTypeOption { auto_fill: false };
+        let relation_field = FieldBuilder::new(field_type, type_option)
+          .name("AI summary")
+          .build();
+        fields.push(relation_field);
+      },
+      FieldType::Time => {
+        let time_field = FieldBuilder::from_field_type(field_type)
+          .name("Estimated time")
+          .build();
+        fields.push(time_field);
+      },
+      FieldType::Translate | FieldType::Media => {},
     }
   }
 
@@ -145,7 +155,7 @@ pub fn make_test_board() -> DatabaseData {
 
   // We have many assumptions base on the number of the rows, so do not change the number of the loop.
   for i in 0..5 {
-    let mut row_builder = TestRowBuilder::new(gen_row_id(), &fields);
+    let mut row_builder = TestRowBuilder::new(&database_id, gen_row_id(), &fields);
     match i {
       0 => {
         for field_type in FieldType::iter() {
@@ -153,9 +163,7 @@ pub fn make_test_board() -> DatabaseData {
             FieldType::RichText => row_builder.insert_text_cell("A"),
             FieldType::Number => row_builder.insert_number_cell("1"),
             // 1647251762 => Mar 14,2022
-            FieldType::DateTime => {
-              row_builder.insert_date_cell(1647251762, None, None, &field_type)
-            },
+            FieldType::DateTime => row_builder.insert_date_cell(1647251762, None, &field_type),
             FieldType::SingleSelect => {
               row_builder.insert_single_select_cell(|mut options| options.remove(0))
             },
@@ -173,9 +181,7 @@ pub fn make_test_board() -> DatabaseData {
             FieldType::RichText => row_builder.insert_text_cell("B"),
             FieldType::Number => row_builder.insert_number_cell("2"),
             // 1647251762 => Mar 14,2022
-            FieldType::DateTime => {
-              row_builder.insert_date_cell(1647251762, None, None, &field_type)
-            },
+            FieldType::DateTime => row_builder.insert_date_cell(1647251762, None, &field_type),
             FieldType::SingleSelect => {
               row_builder.insert_single_select_cell(|mut options| options.remove(0))
             },
@@ -192,9 +198,7 @@ pub fn make_test_board() -> DatabaseData {
             FieldType::RichText => row_builder.insert_text_cell("C"),
             FieldType::Number => row_builder.insert_number_cell("3"),
             // 1647251762 => Mar 14,2022
-            FieldType::DateTime => {
-              row_builder.insert_date_cell(1647251762, None, None, &field_type)
-            },
+            FieldType::DateTime => row_builder.insert_date_cell(1647251762, None, &field_type),
             FieldType::SingleSelect => {
               row_builder.insert_single_select_cell(|mut options| options.remove(1))
             },
@@ -214,9 +218,7 @@ pub fn make_test_board() -> DatabaseData {
           match field_type {
             FieldType::RichText => row_builder.insert_text_cell("DA"),
             FieldType::Number => row_builder.insert_number_cell("4"),
-            FieldType::DateTime => {
-              row_builder.insert_date_cell(1668704685, None, None, &field_type)
-            },
+            FieldType::DateTime => row_builder.insert_date_cell(1668704685, None, &field_type),
             FieldType::SingleSelect => {
               row_builder.insert_single_select_cell(|mut options| options.remove(1))
             },
@@ -231,9 +233,7 @@ pub fn make_test_board() -> DatabaseData {
           match field_type {
             FieldType::RichText => row_builder.insert_text_cell("AE"),
             FieldType::Number => row_builder.insert_number_cell(""),
-            FieldType::DateTime => {
-              row_builder.insert_date_cell(1668359085, None, None, &field_type)
-            },
+            FieldType::DateTime => row_builder.insert_date_cell(1668359085, None, &field_type),
             FieldType::SingleSelect => {
               row_builder.insert_single_select_cell(|mut options| options.remove(2))
             },
@@ -254,7 +254,7 @@ pub fn make_test_board() -> DatabaseData {
 
   let view = DatabaseView {
     id: gen_database_view_id(),
-    database_id: gen_database_id(),
+    database_id: database_id.clone(),
     name: "".to_string(),
     layout: DatabaseLayout::Board,
     layout_settings,
@@ -266,6 +266,13 @@ pub fn make_test_board() -> DatabaseData {
     created_at: 0,
     modified_at: 0,
     field_settings,
+    is_inline: false,
   };
-  DatabaseData { view, fields, rows }
+
+  DatabaseData {
+    database_id,
+    views: vec![view],
+    fields,
+    rows,
+  }
 }

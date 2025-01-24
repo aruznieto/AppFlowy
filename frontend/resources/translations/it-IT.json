@@ -2,12 +2,14 @@
   "appName": "AppFlowy",
   "defaultUsername": "Me",
   "welcomeText": "Benvenuto in @:appName",
+  "welcomeTo": "Benvenuto a",
   "githubStarText": "Vota su GitHub",
   "subscribeNewsletterText": "Sottoscrivi la Newsletter",
   "letsGoButtonText": "Andiamo",
   "title": "Titolo",
   "youCanAlso": "Puoi anche",
   "and": "E",
+  "failedToOpenUrl": "Apertura URL fallita: {}",
   "blockActions": {
     "addBelowTooltip": "Fare clic per aggiungere di seguito",
     "addAboveCmd": "Alt+clic",
@@ -35,41 +37,87 @@
     "loginStartWithAnonymous": "Inizia con una sessione anonima",
     "continueAnonymousUser": "Continua con una sessione anonima",
     "buttonText": "Accedi",
+    "signingInText": "Accesso in corso...",
     "forgotPassword": "Password Dimentica?",
     "emailHint": "Email",
     "passwordHint": "Password",
     "dontHaveAnAccount": "Non hai un account?",
+    "createAccount": "Crea account",
     "repeatPasswordEmptyError": "La password ripetuta non può essere vuota",
     "unmatchedPasswordError": "La password ripetuta non è uguale alla password",
     "syncPromptMessage": "La sincronizzazione dei dati potrebbe richiedere del tempo. Per favore, non chiudere questa pagina",
     "or": "O",
+    "signInWithGoogle": "Continua con Google",
+    "signInWithGithub": "Continua con Github",
+    "signInWithDiscord": "Continua con Discord",
+    "signUpWithGoogle": "Registrati con Google",
+    "signUpWithGithub": "Registrati con Github",
+    "signUpWithDiscord": "Registrati con Discord",
+    "signInWith": "Loggati con:",
+    "signInWithEmail": "Continua con Email",
+    "signInWithMagicLink": "Continua",
+    "signUpWithMagicLink": "Registrati con un Link Magico",
+    "pleaseInputYourEmail": "Per favore, inserisci il tuo indirizzo email",
+    "settings": "Impostazioni",
+    "magicLinkSent": "Link Magico inviato!",
+    "invalidEmail": "Per favore, inserisci un indirizzo email valido",
+    "alreadyHaveAnAccount": "Hai già un account?",
+    "logIn": "Accedi",
+    "generalError": "Qualcosa è andato storto. Per favore, riprova più tardi",
+    "limitRateError": "Per ragioni di sicurezza, puoi richiedere un link magico ogni 60 secondi",
+    "magicLinkSentDescription": "Un Link Magico è stato inviato alla tua email. Clicca il link per completare il tuo accesso. Il link scadrà dopo 5 minuti.",
     "LogInWithGoogle": "Accedi con Google",
     "LogInWithGithub": "Accedi con Github",
     "LogInWithDiscord": "Accedi con Discord",
-    "signInWith": "Loggati con:",
     "loginAsGuestButtonText": "Iniziare"
   },
   "workspace": {
     "chooseWorkspace": "Scegli il tuo spazio di lavoro",
     "create": "Crea spazio di lavoro",
     "reset": "Ripristina lo spazio di lavoro",
+    "renameWorkspace": "Rinomina workspace",
     "resetWorkspacePrompt": "Il ripristino dello spazio di lavoro eliminerà tutte le pagine e i dati al suo interno. Sei sicuro di voler ripristinare lo spazio di lavoro? In alternativa, puoi contattare il team di supporto per ristabilire lo spazio di lavoro",
     "hint": "spazio di lavoro",
     "notFoundError": "Spazio di lavoro non trovato",
-    "failedToLoad": "Qualcosa è andato storto! Impossibile caricare lo spazio di lavoro. Prova a chiudere qualsiasi istanza aperta di AppFlowy e riprova.",
+    "failedToLoad": "Qualcosa è andato storto! Impossibile caricare lo spazio di lavoro. Prova a chiudere qualsiasi istanza aperta di @:appName e riprova.",
     "errorActions": {
       "reportIssue": "Segnala un problema",
       "reportIssueOnGithub": "Segnalate un problema su Github",
       "exportLogFiles": "Esporta i file di log",
       "reachOut": "Contattaci su Discord"
-    }
+    },
+    "deleteWorkspaceHintText": "Sei sicuro di voler cancellare la workspace? Questa azione non è reversibile, e ogni pagina che hai pubblicato sarà rimossa.",
+    "createSuccess": "Workspace creata con successo",
+    "createFailed": "Creazione workspace fallita",
+    "createLimitExceeded": "Hai raggiunto il numero massimo di workspace permesse per il tuo account. Se hai bisogno di ulteriori workspace per continuare il tuo lavoro, per favore fai richiesta su Github",
+    "deleteSuccess": "Workspace cancellata con successo",
+    "deleteFailed": "Cancellazione workspace fallita",
+    "openSuccess": "Workspace aperta con successo",
+    "openFailed": "Apertura workspace fallita",
+    "renameSuccess": "Workspace rinominata con successo",
+    "renameFailed": "Rinomina workspace fallita",
+    "updateIconSuccess": "Icona della workspace aggiornata con successo",
+    "updateIconFailed": "Aggiornamento icona della workspace fallito",
+    "cannotDeleteTheOnlyWorkspace": "Impossibile cancellare l'unica workspace",
+    "fetchWorkspacesFailed": "Recupero workspaces fallito",
+    "leaveCurrentWorkspace": "Lascia workspace",
+    "leaveCurrentWorkspacePrompt": "Sei sicuro di voler lasciare la workspace corrente?"
   },
   "shareAction": {
     "buttonText": "Condividi",
     "workInProgress": "Prossimamente",
     "markdown": "Markdown",
+    "clipboard": "Copia",
     "csv": "CSV",
-    "copyLink": "Copia Link"
+    "copyLink": "Copia Link",
+    "publishToTheWeb": "Pubblica sul Web",
+    "publishToTheWebHint": "Crea un sito con AppFlowy",
+    "publish": "Pubblica",
+    "unPublish": "Annulla la pubblicazione",
+    "visitSite": "Visita sito",
+    "exportAsTab": "Esporta come",
+    "publishTab": "Pubblica",
+    "shareTab": "Condividi"
   },
   "moreAction": {
     "small": "piccolo",
@@ -80,6 +128,7 @@
     "moreOptions": "Più opzioni",
     "wordCount": "Conteggio parole: {}",
     "charCount": "Numero di caratteri: {}",
+    "createdAt": "Creata: {}",
     "deleteView": "Cancella",
     "duplicateView": "Duplica"
   },
@@ -99,7 +148,9 @@
     "openNewTab": "Apri in una nuova scheda",
     "moveTo": "Sposta in",
     "addToFavorites": "Aggiungi ai preferiti",
-    "copyLink": "Copia link"
+    "copyLink": "Copia link",
+    "changeIcon": "Cambia icona",
+    "collapseAllPages": "Comprimi le sottopagine"
   },
   "blankPageTitle": "Pagina vuota",
   "newPageText": "Nuova pagina",
@@ -107,6 +158,34 @@
   "newGridText": "Nuova griglia",
   "newCalendarText": "Nuovo calendario",
   "newBoardText": "Nuova bacheca",
+  "chat": {
+    "newChat": "Chat AI",
+    "inputMessageHint": "Chiedi a @:appName AI",
+    "inputLocalAIMessageHint": "Chiedi a @:appName Local AI",
+    "unsupportedCloudPrompt": "Questa funzione è disponibile solo quando si usa @:appName Cloud",
+    "relatedQuestion": "Correlato",
+    "serverUnavailable": "Servizio temporaneamente non disponibile. Per favore, riprova più tardi.",
+    "aiServerUnavailable": "🌈 Uh-oh! 🌈. Un unicorno ha mangiato la nostra risposta. Per favore, riprova!",
+    "clickToRetry": "Clicca per riprovare",
+    "regenerateAnswer": "Rigenera",
+    "question1": "Come usare Kanban per organizzare le attività",
+    "question2": "Spiega il metodo GTD",
+    "question3": "Perché usare Rust",
+    "question4": "Ricetta con cos'è presente nella mia cucina",
+    "aiMistakePrompt": "Le IA possono fare errori. Controlla le informazioni importanti.",
+    "chatWithFilePrompt": "Vuoi chattare col file?",
+    "indexFileSuccess": "Indicizzazione file completata con successo",
+    "inputActionNoPages": "Nessuna pagina risultante",
+    "referenceSource": {
+      "zero": "0 fonti trovate",
+      "one": "{count} fonte trovata",
+      "other": "{count} fonti trovate"
+    },
+    "clickToMention": "Clicca per menzionare una pagina",
+    "uploadFile": "Carica file PDF, MD o TXT con la quale chattare",
+    "questionDetail": "Salve {}! Come posso aiutarti oggi?",
+    "indexingFile": "Indicizzazione {}"
+  },
   "trash": {
     "text": "Cestino",
     "restoreAll": "Ripristina Tutto",
@@ -125,11 +204,13 @@
       "caption": "Questa azione non può essere annullata."
     },
     "mobile": {
+      "actions": "Azioni del cestino",
       "empty": "Il cestino è vuoto",
       "emptyDescription": "Non hai alcun file eliminato",
       "isDeleted": "è stato cancellato",
       "isRestored": "è stato ripristinato"
-    }
+    },
+    "confirmDeleteTitle": "Sei sicuro di voler eliminare questa pagina permanentemente?"
   },
   "deletePagePrompt": {
     "text": "Questa pagina è nel Cestino",
@@ -183,17 +264,44 @@
     "dragRow": "Premere a lungo per riordinare la riga",
     "viewDataBase": "Visualizza banca dati",
     "referencePage": "Questo {nome} è referenziato",
-    "addBlockBelow": "Aggiungi un blocco qui sotto"
+    "addBlockBelow": "Aggiungi un blocco qui sotto",
+    "aiGenerate": "Genera"
   },
   "sideBar": {
     "closeSidebar": "Close sidebar",
     "openSidebar": "Open sidebar",
     "personal": "Personale",
+    "private": "Privato",
     "favorites": "Preferiti",
+    "clickToHidePrivate": "Clicca per nascondere l'area privata\nLe pagine create qui sono visibili solo a te",
+    "clickToHideWorkspace": "Clicca per nascondere la workspace\nLe pagine che crei qui sono visibili a ogni membro",
     "clickToHidePersonal": "Fare clic per nascondere la sezione personale",
     "clickToHideFavorites": "Fare clic per nascondere la sezione dei preferiti",
     "addAPage": "Aggiungi una pagina",
-    "recent": "Recente"
+    "addAPageToPrivate": "Aggiungi pagina all'area privata",
+    "addAPageToWorkspace": "Aggiungi pagina alla workspace",
+    "recent": "Recente",
+    "today": "Oggi",
+    "thisWeek": "Questa settimana",
+    "others": "Preferiti precedenti",
+    "justNow": "poco fa",
+    "minutesAgo": "{count} minuti fa",
+    "lastViewed": "Visto per ultimo",
+    "favoriteAt": "Aggiunto tra ai preferiti",
+    "emptyRecent": "Nessun documento recente",
+    "emptyRecentDescription": "Quando vedrai documenti, appariranno qui per accesso facilitato",
+    "emptyFavorite": "Nessun documento preferito",
+    "emptyFavoriteDescription": "Comincia a esplorare e marchia documenti come preferiti. Verranno elencati qui per accesso rapido!",
+    "removePageFromRecent": "Rimuovere questa pagina da Recenti?",
+    "removeSuccess": "Rimozione effettuata con successo",
+    "favoriteSpace": "Preferiti",
+    "RecentSpace": "Recenti",
+    "Spaces": "Aree",
+    "upgradeToPro": "Aggiorna a Pro",
+    "upgradeToAIMax": "Sblocca AI illimitata",
+    "storageLimitDialogTitle": "Hai esaurito lo spazio d'archiviazione gratuito. Aggiorna per avere spazio d'archiviazione illimitato!",
+    "aiResponseLimitTitle": "Hai esaurito le risposte AI gratuite. Aggiorna al Piano Pro per acquistare un add-on AI per avere risposte illimitate",
+    "aiResponseLimitDialogTitle": "Numero di riposte AI raggiunto"
   },
   "notifications": {
     "export": {
@@ -280,11 +388,8 @@
       "cloudServerType": "Server cloud",
       "cloudServerTypeTip": "Tieni presente che dopo aver cambiato il server cloud il tuo account corrente potrebbe disconnettersi",
       "cloudLocal": "Locale",
-      "cloudSupabase": "Supabase",
-      "cloudSupabaseUrl": "URL di Supabase",
-      "cloudSupabaseUrlCanNotBeEmpty": "L'url di supabase non può essere vuoto",
-      "cloudAppFlowy": "AppFlowy Cloud",
-      "cloudAppFlowySelfHost": "AppFlowy Cloud Self-hosted (autogestito)",
+      "cloudAppFlowy": "@:appName Cloud Beta",
+      "cloudAppFlowySelfHost": "@:appName Cloud Self-hosted (autogestito)",
       "appFlowyCloudUrlCanNotBeEmpty": "L'url del cloud non può essere vuoto",
       "clickToCopy": "Fare clic per copiare",
       "selfHostStart": "Se non disponi di un server, fai riferimento a",
@@ -305,14 +410,13 @@
       "historicalUserList": "Cronologia di accesso dell'utente",
       "historicalUserListTooltip": "Questo elenco mostra i tuoi account anonimi. È possibile fare clic su un account per visualizzarne i dettagli. Gli account anonimi vengono creati facendo clic sul pulsante \"Inizia\".",
       "openHistoricalUser": "Fare clic per aprire l'account anonimo",
-      "customPathPrompt": "L'archiviazione della cartella dati di AppFlowy in una cartella sincronizzata sul cloud come Google Drive può comportare rischi. Se si accede o si modifica il database all'interno di questa cartella da più posizioni contemporaneamente, potrebbero verificarsi conflitti di sincronizzazione e potenziale danneggiamento dei dati",
-      "importAppFlowyData": "Importa dati dalla cartella AppFlowy esterna",
+      "customPathPrompt": "L'archiviazione della cartella dati di @:appName in una cartella sincronizzata sul cloud come Google Drive può comportare rischi. Se si accede o si modifica il database all'interno di questa cartella da più posizioni contemporaneamente, potrebbero verificarsi conflitti di sincronizzazione e potenziale danneggiamento dei dati",
+      "importAppFlowyData": "Importa dati dalla cartella @:appName esterna",
       "importingAppFlowyDataTip": "L'importazione dei dati è in corso. Non chiudere l'applicazione",
-      "importAppFlowyDataDescription": "Copia i dati da una cartella dati AppFlowy esterna e importali nella cartella dati AppFlowy corrente",
-      "importSuccess": "Importazione della cartella dati AppFlowy riuscita",
-      "importFailed": "L'importazione della cartella dati di AppFlowy non è riuscita",
-      "importGuide": "Per ulteriori dettagli si prega di consultare il documento di riferimento",
-      "supabaseSetting": "Impostazione Supabase"
+      "importAppFlowyDataDescription": "Copia i dati da una cartella dati @:appName esterna e importali nella cartella dati @:appName corrente",
+      "importSuccess": "Importazione della cartella dati @:appName riuscita",
+      "importFailed": "L'importazione della cartella dati di @:appName non è riuscita",
+      "importGuide": "Per ulteriori dettagli si prega di consultare il documento di riferimento"
     },
     "notifications": {
       "enableNotifications": {
@@ -360,7 +464,7 @@
       "themeUpload": {
         "button": "Caricamento",
         "uploadTheme": "Carica tema",
-        "description": "Carica il tuo tema AppFlowy utilizzando il pulsante in basso.",
+        "description": "Carica il tuo tema @:appName utilizzando il pulsante in basso.",
         "loading": "Attendi mentre convalidiamo e carichiamo il tuo tema...",
         "uploadSuccess": "Il tuo tema è stato caricato correttamente",
         "deletionFailure": "Impossibile eliminare il tema. Prova a eliminarlo manualmente.",
@@ -391,7 +495,7 @@
       "defaultLocation": "Leggi i file e la posizione di archiviazione dei dati",
       "exportData": "Esporta i tuoi dati",
       "doubleTapToCopy": "Tocca due volte per copiare il percorso",
-      "restoreLocation": "Ripristina nel percorso predefinito di AppFlowy",
+      "restoreLocation": "Ripristina nel percorso predefinito di @:appName",
       "customizeLocation": "Apri un'altra cartella",
       "restartApp": "Riavvia l'app per rendere effettive le modifiche.",
       "exportDatabase": "Esporta banca dati",
@@ -403,10 +507,10 @@
       "defineWhereYourDataIsStored": "Definisci dove sono archiviati i tuoi dati",
       "open": "Aprire",
       "openFolder": "Apri una cartella esistente",
-      "openFolderDesc": "Leggilo e scrivilo nella tua cartella AppFlowy esistente",
+      "openFolderDesc": "Leggilo e scrivilo nella tua cartella @:appName esistente",
       "folderHintText": "nome della cartella",
       "location": "Creazione di una nuova cartella",
-      "locationDesc": "Scegli un nome per la cartella dei dati di AppFlowy",
+      "locationDesc": "Scegli un nome per la cartella dei dati di @:appName",
       "browser": "Navigare",
       "create": "Creare",
       "set": "Impostato",
@@ -417,7 +521,7 @@
       "change": "Modifica",
       "openLocationTooltips": "Apri un'altra directory di dati",
       "openCurrentDataFolder": "Apre la directory dei dati corrente",
-      "recoverLocationTooltips": "Ripristina la directory dei dati predefinita di AppFlowy",
+      "recoverLocationTooltips": "Ripristina la directory dei dati predefinita di @:appName",
       "exportFileSuccess": "Esporta file con successo!",
       "exportFileFail": "File di esportazione non riuscito!",
       "export": "Esportare"
@@ -427,20 +531,9 @@
       "email": "E-mail",
       "tooltipSelectIcon": "Seleziona l'icona",
       "selectAnIcon": "Seleziona un'icona",
-      "pleaseInputYourOpenAIKey": "inserisci la tua chiave OpenAI",
-      "pleaseInputYourStabilityAIKey": "per favore inserisci la tua chiave Stability AI",
-      "clickToLogout": "Fare clic per disconnettere l'utente corrente"
-    },
-    "shortcuts": {
-      "shortcutsLabel": "Scorciatoie",
-      "command": "Comando",
-      "keyBinding": "Combinazione",
-      "addNewCommand": "Aggiungi un nuovo comando",
-      "updateShortcutStep": "Premi la combinazione di tasti e poi premi INVIO",
-      "shortcutIsAlreadyUsed": "Questa scorciatoia è già usata per: {conflict}",
-      "resetToDefault": "Ripristina le combinazioni di default",
-      "couldNotLoadErrorMsg": "Impossibile caricare le scorciatoie, Riprova.",
-      "couldNotSaveErrorMsg": "Impossibile salvare le scorciatoie, Riprova."
+      "pleaseInputYourOpenAIKey": "inserisci la tua chiave AI",
+      "clickToLogout": "Fare clic per disconnettere l'utente corrente",
+      "pleaseInputYourStabilityAIKey": "per favore inserisci la tua chiave Stability AI"
     },
     "mobile": {
       "personalInfo": "Informazione personale",
@@ -458,6 +551,17 @@
       "selectLayout": "Seleziona disposizione",
       "selectStartingDay": "Seleziona il giorno di inizio",
       "version": "Versione"
+    },
+    "shortcuts": {
+      "shortcutsLabel": "Scorciatoie",
+      "command": "Comando",
+      "keyBinding": "Combinazione",
+      "addNewCommand": "Aggiungi un nuovo comando",
+      "updateShortcutStep": "Premi la combinazione di tasti e poi premi INVIO",
+      "shortcutIsAlreadyUsed": "Questa scorciatoia è già usata per: {conflict}",
+      "resetToDefault": "Ripristina le combinazioni di default",
+      "couldNotLoadErrorMsg": "Impossibile caricare le scorciatoie, Riprova.",
+      "couldNotSaveErrorMsg": "Impossibile salvare le scorciatoie, Riprova."
     }
   },
   "grid": {
@@ -613,8 +717,8 @@
       "cannotFindCreatableField": "Impossibile trovare un campo adatto per l'ordinamento",
       "deleteAllSorts": "Elimina tutti gli ordinamenti",
       "addSort": "Aggiungi ordinamento",
-      "deleteSort": "Elimina ordinamento",
-      "removeSorting": "Si desidera rimuovere l'ordinamento?"
+      "removeSorting": "Si desidera rimuovere l'ordinamento?",
+      "deleteSort": "Elimina ordinamento"
     },
     "row": {
       "duplicate": "Duplicare",
@@ -706,26 +810,27 @@
       "referencedGrid": "Griglia di riferimento",
       "referencedCalendar": "Calendario referenziato",
       "referencedDocument": "Documento riferito",
-      "autoGeneratorMenuItemName": "Scrittore OpenAI",
-      "autoGeneratorTitleName": "OpenAI: chiedi all'AI di scrivere qualsiasi cosa...",
+      "autoGeneratorMenuItemName": "Scrittore AI",
+      "autoGeneratorTitleName": "AI: chiedi all'AI di scrivere qualsiasi cosa...",
       "autoGeneratorLearnMore": "Saperne di più",
       "autoGeneratorGenerate": "creare",
-      "autoGeneratorHintText": "Chiedi a OpenAI...",
-      "autoGeneratorCantGetOpenAIKey": "Impossibile ottenere la chiave OpenAI",
+      "autoGeneratorHintText": "Chiedi a AI...",
+      "autoGeneratorCantGetOpenAIKey": "Impossibile ottenere la chiave AI",
       "autoGeneratorRewrite": "Riscrivere",
       "smartEdit": "Assistenti AI",
-      "openAI": "OpenAI",
+      "aI": "AI",
       "smartEditFixSpelling": "Correggi l'ortografia",
       "warning": "⚠️ Le risposte AI possono essere imprecise o fuorvianti.",
       "smartEditSummarize": "Riassumere",
       "smartEditImproveWriting": "Migliora la scrittura",
       "smartEditMakeLonger": "Rendi più lungo",
-      "smartEditCouldNotFetchResult": "Impossibile recuperare il risultato da OpenAI",
-      "smartEditCouldNotFetchKey": "Impossibile recuperare la chiave OpenAI",
-      "smartEditDisabled": "Connetti OpenAI in Impostazioni",
+      "smartEditCouldNotFetchResult": "Impossibile recuperare il risultato da AI",
+      "smartEditCouldNotFetchKey": "Impossibile recuperare la chiave AI",
+      "smartEditDisabled": "Connetti AI in Impostazioni",
       "discardResponse": "Vuoi scartare le risposte AI?",
       "createInlineMathEquation": "Crea un'equazione",
       "fonts": "Caratteri",
+      "emoji": "Emoji",
       "toggleList": "Elenco alternato",
       "quoteList": "Elenco citazioni",
       "numberedList": "Elenco numerato",
@@ -777,8 +882,8 @@
         "defaultColor": "Predefinito"
       },
       "image": {
-        "copiedToPasteBoard": "Il link dell'immagine è stato copiato negli appunti",
         "addAnImage": "Aggiungi un'immagine",
+        "copiedToPasteBoard": "Il link dell'immagine è stato copiato negli appunti",
         "imageUploadFailed": "Caricamento dell'immagine non riuscito"
       },
       "urlPreview": {
@@ -811,8 +916,7 @@
         "newDatabase": "Nuova banca dati",
         "linkToDatabase": "Collegamento alla banca dati"
       },
-      "date": "Data",
-      "emoji": "Emoji"
+      "date": "Data"
     },
     "textBlock": {
       "placeholder": "Digita '/' per i comandi"
@@ -831,8 +935,8 @@
         "placeholder": "Inserisci l'URL dell'immagine"
       },
       "ai": {
-        "label": "Genera immagine da OpenAI",
-        "placeholder": "Inserisci la richiesta affinché OpenAI generi l'immagine"
+        "label": "Genera immagine da AI",
+        "placeholder": "Inserisci la richiesta affinché AI generi l'immagine"
       },
       "stability_ai": {
         "label": "Genera immagine da Stability AI",
@@ -853,15 +957,15 @@
         "label": "Unsplash"
       },
       "searchForAnImage": "Cerca un'immagine",
-      "pleaseInputYourOpenAIKey": "inserisci la tua chiave OpenAI nella pagina Impostazioni",
-      "pleaseInputYourStabilityAIKey": "inserisci la chiave Stability AI nella pagina Impostazioni",
+      "pleaseInputYourOpenAIKey": "inserisci la tua chiave AI nella pagina Impostazioni",
       "saveImageToGallery": "Salva immagine",
       "failedToAddImageToGallery": "Impossibile aggiungere l'immagine alla galleria",
       "successToAddImageToGallery": "Immagine aggiunta alla galleria con successo",
       "unableToLoadImage": "Impossibile caricare l'immagine",
       "maximumImageSize": "La dimensione massima supportata per il caricamento delle immagini è di 10 MB",
       "uploadImageErrorImageSizeTooBig": "Le dimensioni dell'immagine devono essere inferiori a 10 MB",
-      "imageIsUploading": "L'immagine si sta caricando"
+      "imageIsUploading": "L'immagine si sta caricando",
+      "pleaseInputYourStabilityAIKey": "inserisci la chiave Stability AI nella pagina Impostazioni"
     },
     "codeBlock": {
       "language": {
@@ -934,9 +1038,9 @@
     "notesTooltip": "Note all'interno",
     "mobile": {
       "editURL": "Modifica URL",
-      "unhideGroup": "Mostra gruppo",
-      "unhideGroupContent": "Sei sicuro di voler mostrare questo gruppo sulla bacheca?",
-      "faildToLoad": "Impossibile caricare la visualizzazione della bacheca"
+      "showGroup": "Mostra gruppo",
+      "showGroupContent": "Sei sicuro di voler mostrare questo gruppo sulla bacheca?",
+      "failedToLoad": "Impossibile caricare la visualizzazione della bacheca"
     }
   },
   "calendar": {
@@ -969,7 +1073,7 @@
     "quickJumpYear": "Salta a"
   },
   "errorDialog": {
-    "title": "Errore AppFlow",
+    "title": "Errore @:appName",
     "howToFixFallback": "Ci scusiamo per l'inconveniente! Invia un problema sulla nostra pagina GitHub che descriva il tuo errore.",
     "github": "Visualizza su GitHub"
   },

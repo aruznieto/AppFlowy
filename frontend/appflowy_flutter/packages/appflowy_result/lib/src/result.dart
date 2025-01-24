@@ -10,16 +10,18 @@ abstract class FlowyResult<S, F extends Object> {
   FlowyResult<T, F> map<T>(T Function(S success) fn);
   FlowyResult<S, T> mapError<T extends Object>(T Function(F failure) fn);
 
-  bool isSuccess();
-  bool isFailure();
+  bool get isSuccess;
+  bool get isFailure;
 
   S? toNullable();
 
-  void onSuccess(void Function(S s) onSuccess);
-  void onFailure(void Function(F f) onFailure);
+  T? onSuccess<T>(T? Function(S s) onSuccess);
+  T? onFailure<T>(T? Function(F f) onFailure);
 
   S getOrElse(S Function(F failure) onFailure);
   S getOrThrow();
+
+  F getFailure();
 }
 
 class FlowySuccess<S, F extends Object> implements FlowyResult<S, F> {
@@ -57,14 +59,10 @@ class FlowySuccess<S, F extends Object> implements FlowyResult<S, F> {
   }
 
   @override
-  bool isSuccess() {
-    return true;
-  }
+  bool get isSuccess => true;
 
   @override
-  bool isFailure() {
-    return false;
-  }
+  bool get isFailure => false;
 
   @override
   S? toNullable() {
@@ -72,12 +70,14 @@ class FlowySuccess<S, F extends Object> implements FlowyResult<S, F> {
   }
 
   @override
-  void onSuccess(void Function(S success) onSuccess) {
-    onSuccess(_value);
+  T? onSuccess<T>(T? Function(S success) onSuccess) {
+    return onSuccess(_value);
   }
 
   @override
-  void onFailure(void Function(F failure) onFailure) {}
+  T? onFailure<T>(T? Function(F failure) onFailure) {
+    return null;
+  }
 
   @override
   S getOrElse(S Function(F failure) onFailure) {
@@ -87,6 +87,11 @@ class FlowySuccess<S, F extends Object> implements FlowyResult<S, F> {
   @override
   S getOrThrow() {
     return _value;
+  }
+
+  @override
+  F getFailure() {
+    throw UnimplementedError();
   }
 }
 
@@ -125,14 +130,10 @@ class FlowyFailure<S, F extends Object> implements FlowyResult<S, F> {
   }
 
   @override
-  bool isSuccess() {
-    return false;
-  }
+  bool get isSuccess => false;
 
   @override
-  bool isFailure() {
-    return true;
-  }
+  bool get isFailure => true;
 
   @override
   S? toNullable() {
@@ -140,11 +141,13 @@ class FlowyFailure<S, F extends Object> implements FlowyResult<S, F> {
   }
 
   @override
-  void onSuccess(void Function(S success) onSuccess) {}
+  T? onSuccess<T>(T? Function(S success) onSuccess) {
+    return null;
+  }
 
   @override
-  void onFailure(void Function(F failure) onFailure) {
-    onFailure(_value);
+  T? onFailure<T>(T? Function(F failure) onFailure) {
+    return onFailure(_value);
   }
 
   @override
@@ -155,5 +158,10 @@ class FlowyFailure<S, F extends Object> implements FlowyResult<S, F> {
   @override
   S getOrThrow() {
     throw _value;
+  }
+
+  @override
+  F getFailure() {
+    return _value;
   }
 }

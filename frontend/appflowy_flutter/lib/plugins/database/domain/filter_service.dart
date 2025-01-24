@@ -1,15 +1,6 @@
 import 'package:appflowy_backend/dispatch/dispatch.dart';
 import 'package:appflowy_backend/log.dart';
-import 'package:appflowy_backend/protobuf/flowy-database2/checkbox_filter.pbserver.dart';
-import 'package:appflowy_backend/protobuf/flowy-database2/checklist_filter.pb.dart';
-import 'package:appflowy_backend/protobuf/flowy-database2/database_entities.pb.dart';
-import 'package:appflowy_backend/protobuf/flowy-database2/date_filter.pbserver.dart';
-import 'package:appflowy_backend/protobuf/flowy-database2/field_entities.pb.dart';
-import 'package:appflowy_backend/protobuf/flowy-database2/number_filter.pb.dart';
-import 'package:appflowy_backend/protobuf/flowy-database2/select_option_filter.pbserver.dart';
-import 'package:appflowy_backend/protobuf/flowy-database2/setting_entities.pb.dart';
-import 'package:appflowy_backend/protobuf/flowy-database2/text_filter.pb.dart';
-import 'package:appflowy_backend/protobuf/flowy-database2/util.pb.dart';
+import 'package:appflowy_backend/protobuf/flowy-database2/protobuf.dart';
 import 'package:appflowy_backend/protobuf/flowy-error/errors.pb.dart';
 import 'package:appflowy_result/appflowy_result.dart';
 import 'package:fixnum/fixnum.dart' as $fixnum;
@@ -101,45 +92,35 @@ class FilterBackendService {
 
   Future<FlowyResult<void, FlowyError>> insertDateFilter({
     required String fieldId,
+    required FieldType fieldType,
     String? filterId,
     required DateFilterConditionPB condition,
-    required FieldType fieldType,
     int? start,
     int? end,
     int? timestamp,
   }) {
-    assert(
-      [
-        FieldType.DateTime,
-        FieldType.LastEditedTime,
-        FieldType.CreatedTime,
-      ].contains(fieldType),
-    );
+    final filter = DateFilterPB()..condition = condition;
 
-    final filter = DateFilterPB();
     if (timestamp != null) {
       filter.timestamp = $fixnum.Int64(timestamp);
-    } else {
-      if (start != null && end != null) {
-        filter.start = $fixnum.Int64(start);
-        filter.end = $fixnum.Int64(end);
-      } else {
-        throw Exception(
-          "Start and end should not be null if the timestamp is null",
-        );
-      }
+    }
+    if (start != null) {
+      filter.start = $fixnum.Int64(start);
+    }
+    if (end != null) {
+      filter.end = $fixnum.Int64(end);
     }
 
     return filterId == null
         ? insertFilter(
             fieldId: fieldId,
-            fieldType: FieldType.DateTime,
+            fieldType: fieldType,
             data: filter.writeToBuffer(),
           )
         : updateFilter(
             filterId: filterId,
             fieldId: fieldId,
-            fieldType: FieldType.DateTime,
+            fieldType: fieldType,
             data: filter.writeToBuffer(),
           );
   }
@@ -215,6 +196,30 @@ class FilterBackendService {
           );
   }
 
+  Future<FlowyResult<void, FlowyError>> insertTimeFilter({
+    required String fieldId,
+    String? filterId,
+    required NumberFilterConditionPB condition,
+    String content = "",
+  }) {
+    final filter = TimeFilterPB()
+      ..condition = condition
+      ..content = content;
+
+    return filterId == null
+        ? insertFilter(
+            fieldId: fieldId,
+            fieldType: FieldType.Time,
+            data: filter.writeToBuffer(),
+          )
+        : updateFilter(
+            filterId: filterId,
+            fieldId: fieldId,
+            fieldType: FieldType.Time,
+            data: filter.writeToBuffer(),
+          );
+  }
+
   Future<FlowyResult<void, FlowyError>> insertFilter({
     required String fieldId,
     required FieldType fieldType,
@@ -270,13 +275,34 @@ class FilterBackendService {
     );
   }
 
-  Future<FlowyResult<void, FlowyError>> deleteFilter({
+  Future<FlowyResult<void, FlowyError>> insertMediaFilter({
     required String fieldId,
+    String? filterId,
+    required MediaFilterConditionPB condition,
+    String content = "",
+  }) {
+    final filter = MediaFilterPB()
+      ..condition = condition
+      ..content = content;
+
+    return filterId == null
+        ? insertFilter(
+            fieldId: fieldId,
+            fieldType: FieldType.Media,
+            data: filter.writeToBuffer(),
+          )
+        : updateFilter(
+            filterId: filterId,
+            fieldId: fieldId,
+            fieldType: FieldType.Media,
+            data: filter.writeToBuffer(),
+          );
+  }
+
+  Future<FlowyResult<void, FlowyError>> deleteFilter({
     required String filterId,
   }) async {
-    final deleteFilterPayload = DeleteFilterPB()
-      ..fieldId = fieldId
-      ..filterId = filterId;
+    final deleteFilterPayload = DeleteFilterPB()..filterId = filterId;
 
     final payload = DatabaseSettingChangesetPB()
       ..viewId = viewId

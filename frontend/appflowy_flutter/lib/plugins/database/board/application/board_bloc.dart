@@ -3,18 +3,23 @@ import 'dart:collection';
 
 import 'package:appflowy/plugins/database/application/defines.dart';
 import 'package:appflowy/plugins/database/application/field/field_info.dart';
-import 'package:appflowy/plugins/database/domain/group_service.dart';
 import 'package:appflowy/plugins/database/application/row/row_service.dart';
+import 'package:appflowy/plugins/database/board/group_ext.dart';
+import 'package:appflowy/plugins/database/domain/group_service.dart';
+import 'package:appflowy_backend/dispatch/dispatch.dart';
 import 'package:appflowy_backend/log.dart';
 import 'package:appflowy_backend/protobuf/flowy-database2/protobuf.dart';
 import 'package:appflowy_backend/protobuf/flowy-error/errors.pb.dart';
-import 'package:appflowy_backend/protobuf/flowy-folder/view.pb.dart';
+import 'package:appflowy_backend/protobuf/flowy-user/user_profile.pb.dart';
 import 'package:appflowy_board/appflowy_board.dart';
 import 'package:appflowy_result/appflowy_result.dart';
+import 'package:collection/collection.dart';
+import 'package:equatable/equatable.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:freezed_annotation/freezed_annotation.dart';
 import 'package:protobuf/protobuf.dart' hide FieldInfo;
+import 'package:universal_platform/universal_platform.dart';
 
 import '../../application/database_controller.dart';
 import '../../application/field/field_controller.dart';
@@ -25,232 +30,286 @@ part 'board_bloc.freezed.dart';
 
 class BoardBloc extends Bloc<BoardEvent, BoardState> {
   BoardBloc({
-    required ViewPB view,
     required this.databaseController,
-  }) : super(BoardState.initial(view.id)) {
+    this.didCreateRow,
+    AppFlowyBoardController? boardController,
+  }) : super(const BoardState.loading()) {
     groupBackendSvc = GroupBackendService(viewId);
-    boardController = AppFlowyBoardController(
-      onMoveGroup: (fromGroupId, fromIndex, toGroupId, toIndex) =>
-          databaseController.moveGroup(
-        fromGroupId: fromGroupId,
-        toGroupId: toGroupId,
-      ),
-      onMoveGroupItem: (groupId, fromIndex, toIndex) {
-        final fromRow = groupControllers[groupId]?.rowAtIndex(fromIndex);
-        final toRow = groupControllers[groupId]?.rowAtIndex(toIndex);
-        if (fromRow != null) {
-          databaseController.moveGroupRow(
-            fromRow: fromRow,
-            toRow: toRow,
-            fromGroupId: groupId,
-            toGroupId: groupId,
-          );
-        }
-      },
-      onMoveGroupItemToGroup: (fromGroupId, fromIndex, toGroupId, toIndex) {
-        final fromRow = groupControllers[fromGroupId]?.rowAtIndex(fromIndex);
-        final toRow = groupControllers[toGroupId]?.rowAtIndex(toIndex);
-        if (fromRow != null) {
-          databaseController.moveGroupRow(
-            fromRow: fromRow,
-            toRow: toRow,
-            fromGroupId: fromGroupId,
-            toGroupId: toGroupId,
-          );
-        }
-      },
-    );
-
+    _initBoardController(boardController);
     _dispatch();
   }
 
   final DatabaseController databaseController;
+  late final AppFlowyBoardController boardController;
   final LinkedHashMap<String, GroupController> groupControllers =
       LinkedHashMap();
   final List<GroupPB> groupList = [];
 
-  late final AppFlowyBoardController boardController;
+  final ValueNotifier<DidCreateRowResult?>? didCreateRow;
+
   late final GroupBackendService groupBackendSvc;
+
+  UserProfilePB? _userProfile;
+  UserProfilePB? get userProfile => _userProfile;
 
   FieldController get fieldController => databaseController.fieldController;
   String get viewId => databaseController.viewId;
+
+  DatabaseCallbacks? _databaseCallbacks;
+  DatabaseLayoutSettingCallbacks? _layoutSettingsCallback;
+  GroupCallbacks? _groupCallbacks;
+
+  void _initBoardController(AppFlowyBoardController? controller) {
+    boardController = controller ??
+        AppFlowyBoardController(
+          onMoveGroup: (fromGroupId, fromIndex, toGroupId, toIndex) =>
+              databaseController.moveGroup(
+            fromGroupId: fromGroupId,
+            toGroupId: toGroupId,
+          ),
+          onMoveGroupItem: (groupId, fromIndex, toIndex) {
+            final fromRow = groupControllers[groupId]?.rowAtIndex(fromIndex);
+            final toRow = groupControllers[groupId]?.rowAtIndex(toIndex);
+            if (fromRow != null) {
+              databaseController.moveGroupRow(
+                fromRow: fromRow,
+                toRow: toRow,
+                fromGroupId: groupId,
+                toGroupId: groupId,
+              );
+            }
+          },
+          onMoveGroupItemToGroup: (fromGroupId, fromIndex, toGroupId, toIndex) {
+            final fromRow =
+                groupControllers[fromGroupId]?.rowAtIndex(fromIndex);
+            final toRow = groupControllers[toGroupId]?.rowAtIndex(toIndex);
+            if (fromRow != null) {
+              databaseController.moveGroupRow(
+                fromRow: fromRow,
+                toRow: toRow,
+                fromGroupId: fromGroupId,
+                toGroupId: toGroupId,
+              );
+            }
+          },
+        );
+  }
 
   void _dispatch() {
     on<BoardEvent>(
       (event, emit) async {
         await event.when(
           initial: () async {
+            emit(BoardState.initial(viewId));
             _startListening();
-            await _openGrid(emit);
+            await _openDatabase(emit);
+
+            final result = await UserEventGetUserProfile().send();
+            result.fold(
+              (profile) => _userProfile = profile,
+              (err) => Log.error('Failed to fetch user profile: ${err.msg}'),
+            );
           },
-          createHeaderRow: (groupId) async {
-            final rowId = groupControllers[groupId]?.firstRow()?.id;
-            final position = rowId == null
-                ? OrderObjectPositionTypePB.Start
-                : OrderObjectPositionTypePB.Before;
+          createRow: (groupId, position, title, targetRowId) async {
+            final primaryField = databaseController.fieldController.fieldInfos
+                .firstWhereOrNull((element) => element.isPrimary)!;
+            final void Function(RowDataBuilder)? cellBuilder = title == null
+                ? null
+                : (builder) => builder.insertText(primaryField, title);
+
             final result = await RowBackendService.createRow(
               viewId: databaseController.viewId,
               groupId: groupId,
               position: position,
-              targetRowId: rowId,
+              targetRowId: targetRowId,
+              withCells: cellBuilder,
             );
 
-            result.fold(
-              (rowMeta) => emit(state.copyWith(recentAddedRowMeta: rowMeta)),
-              (err) => Log.error(err),
-            );
-          },
-          createBottomRow: (groupId) async {
-            final rowId = groupControllers[groupId]?.lastRow()?.id;
-            final position = rowId == null
-                ? OrderObjectPositionTypePB.End
-                : OrderObjectPositionTypePB.After;
-            final result = await RowBackendService.createRow(
-              viewId: databaseController.viewId,
-              groupId: groupId,
-              position: position,
-              targetRowId: rowId,
-            );
+            final startEditing = position != OrderObjectPositionTypePB.End;
+            final action = UniversalPlatform.isMobile
+                ? DidCreateRowAction.openAsPage
+                : startEditing
+                    ? DidCreateRowAction.startEditing
+                    : DidCreateRowAction.none;
 
             result.fold(
-              (rowMeta) => emit(state.copyWith(recentAddedRowMeta: rowMeta)),
+              (rowMeta) {
+                state.maybeMap(
+                  ready: (value) {
+                    didCreateRow?.value = DidCreateRowResult(
+                      action: action,
+                      rowMeta: rowMeta,
+                      groupId: groupId,
+                    );
+                  },
+                  orElse: () {},
+                );
+              },
               (err) => Log.error(err),
             );
           },
           createGroup: (name) async {
             final result = await groupBackendSvc.createGroup(name: name);
-            result.fold((_) {}, (err) => Log.error(err));
+            result.onFailure(Log.error);
           },
           deleteGroup: (groupId) async {
             final result = await groupBackendSvc.deleteGroup(groupId: groupId);
-            result.fold((_) {}, (err) => Log.error(err));
+            result.onFailure(Log.error);
           },
-          didCreateRow: (group, row, int? index) {
-            emit(
-              state.copyWith(
-                isEditingRow: true,
-                editingRow: BoardEditingRow(
-                  group: group,
-                  row: row,
-                  index: index,
-                ),
-              ),
+          renameGroup: (groupId, name) async {
+            final result = await groupBackendSvc.updateGroup(
+              groupId: groupId,
+              name: name,
             );
-            _groupItemStartEditing(group, row, true);
+            result.onFailure(Log.error);
           },
-          didReceiveGridUpdate: (DatabasePB grid) {
-            emit(state.copyWith(grid: grid));
-          },
-          didReceiveError: (FlowyError error) {
-            emit(state.copyWith(noneOrError: error));
+          didReceiveError: (error) {
+            emit(BoardState.error(error: error));
           },
           didReceiveGroups: (List<GroupPB> groups) {
-            final hiddenGroups = _filterHiddenGroups(hideUngrouped, groups);
-            emit(
-              state.copyWith(
-                hiddenGroups: hiddenGroups,
-                groupIds: groups.map((group) => group.groupId).toList(),
-              ),
+            state.maybeMap(
+              ready: (state) {
+                emit(
+                  state.copyWith(
+                    hiddenGroups: _filterHiddenGroups(hideUngrouped, groups),
+                    groupIds: groups.map((group) => group.groupId).toList(),
+                  ),
+                );
+              },
+              orElse: () {},
             );
           },
           didUpdateLayoutSettings: (layoutSettings) {
-            final hiddenGroups = _filterHiddenGroups(hideUngrouped, groupList);
-            emit(
-              state.copyWith(
-                layoutSettings: layoutSettings,
-                hiddenGroups: hiddenGroups,
-              ),
+            state.maybeMap(
+              ready: (state) {
+                emit(
+                  state.copyWith(
+                    layoutSettings: layoutSettings,
+                    hiddenGroups: _filterHiddenGroups(hideUngrouped, groupList),
+                  ),
+                );
+              },
+              orElse: () {},
             );
           },
-          toggleGroupVisibility: (GroupPB group, bool isVisible) async {
-            await _toggleGroupVisibility(group, isVisible);
+          setGroupVisibility: (GroupPB group, bool isVisible) async {
+            await _setGroupVisibility(group, isVisible);
           },
           toggleHiddenSectionVisibility: (isVisible) async {
-            final newLayoutSettings = state.layoutSettings!;
-            newLayoutSettings.freeze();
+            await state.maybeMap(
+              ready: (state) async {
+                final newLayoutSettings = state.layoutSettings!;
+                newLayoutSettings.freeze();
 
-            final newLayoutSetting = newLayoutSettings.rebuild(
-              (message) => message.collapseHiddenGroups = isVisible,
-            );
+                final newLayoutSetting = newLayoutSettings.rebuild(
+                  (message) => message.collapseHiddenGroups = isVisible,
+                );
 
-            await databaseController.updateLayoutSetting(
-              boardLayoutSetting: newLayoutSetting,
+                await databaseController.updateLayoutSetting(
+                  boardLayoutSetting: newLayoutSetting,
+                );
+              },
+              orElse: () {},
             );
           },
           reorderGroup: (fromGroupId, toGroupId) async {
             _reorderGroup(fromGroupId, toGroupId, emit);
           },
-          startEditingRow: (group, row) {
-            emit(
-              state.copyWith(
-                isEditingRow: true,
-                editingRow: BoardEditingRow(
-                  group: group,
-                  row: row,
-                  index: null,
-                ),
-              ),
-            );
-            _groupItemStartEditing(group, row, true);
-          },
-          endEditingRow: (rowId) {
-            if (state.editingRow != null && state.isEditingRow) {
-              assert(state.editingRow!.row.id == rowId);
-              _groupItemStartEditing(
-                state.editingRow!.group,
-                state.editingRow!.row,
-                false,
-              );
-
-              emit(state.copyWith(isEditingRow: false, editingRow: null));
-            }
-          },
           startEditingHeader: (String groupId) {
-            emit(
-              state.copyWith(isEditingHeader: true, editingHeaderId: groupId),
+            state.maybeMap(
+              ready: (state) => emit(state.copyWith(editingHeaderId: groupId)),
+              orElse: () {},
             );
           },
           endEditingHeader: (String groupId, String? groupName) async {
-            await groupBackendSvc.updateGroup(
-              fieldId: groupControllers.values.first.group.fieldId,
-              groupId: groupId,
-              name: groupName,
+            final group = groupControllers[groupId]?.group;
+            if (group != null) {
+              final currentName = group.generateGroupName(databaseController);
+              if (currentName != groupName) {
+                await groupBackendSvc.updateGroup(
+                  groupId: groupId,
+                  name: groupName,
+                );
+              }
+            }
+
+            state.maybeMap(
+              ready: (state) => emit(state.copyWith(editingHeaderId: null)),
+              orElse: () {},
             );
-            emit(state.copyWith(isEditingHeader: false));
+          },
+          deleteCards: (groupedRowIds) async {
+            final rowIds = groupedRowIds.map((e) => e.rowId).toList();
+            await RowBackendService.deleteRows(viewId, rowIds);
+          },
+          moveGroupToAdjacentGroup: (groupedRowId, toPrevious) async {
+            final fromRow =
+                databaseController.rowCache.getRow(groupedRowId.rowId)?.rowMeta;
+            final currentGroupIndex =
+                boardController.groupIds.indexOf(groupedRowId.groupId);
+            final toGroupIndex =
+                toPrevious ? currentGroupIndex - 1 : currentGroupIndex + 1;
+            if (fromRow != null &&
+                toGroupIndex > -1 &&
+                toGroupIndex < boardController.groupIds.length) {
+              final toGroupId = boardController.groupDatas[toGroupIndex].id;
+              final result = await databaseController.moveGroupRow(
+                fromRow: fromRow,
+                fromGroupId: groupedRowId.groupId,
+                toGroupId: toGroupId,
+              );
+              result.fold(
+                (s) {
+                  final previousState = state;
+                  emit(
+                    BoardState.setFocus(
+                      groupedRowIds: [
+                        GroupedRowId(
+                          groupId: toGroupId,
+                          rowId: groupedRowId.rowId,
+                        ),
+                      ],
+                    ),
+                  );
+                  emit(previousState);
+                },
+                (f) {},
+              );
+            }
+          },
+          openRowDetail: (rowMeta) {
+            final copyState = state;
+            emit(BoardState.openRowDetail(rowMeta: rowMeta));
+            emit(copyState);
           },
         );
       },
     );
   }
 
-  void _groupItemStartEditing(GroupPB group, RowMetaPB row, bool isEdit) {
-    final fieldInfo = fieldController.getField(group.fieldId);
-    if (fieldInfo == null) {
-      return Log.warn("fieldInfo should not be null");
-    }
-
-    boardController.enableGroupDragging(!isEdit);
-  }
-
-  Future<void> _toggleGroupVisibility(GroupPB group, bool isVisible) async {
+  Future<void> _setGroupVisibility(GroupPB group, bool isVisible) async {
     if (group.isDefault) {
-      final newLayoutSettings = state.layoutSettings!;
-      newLayoutSettings.freeze();
+      await state.maybeMap(
+        ready: (state) async {
+          final newLayoutSettings = state.layoutSettings!;
+          newLayoutSettings.freeze();
 
-      final newLayoutSetting = newLayoutSettings.rebuild(
-        (message) => message.hideUngroupedColumn = !isVisible,
+          final newLayoutSetting = newLayoutSettings.rebuild(
+            (message) => message.hideUngroupedColumn = !isVisible,
+          );
+
+          await databaseController.updateLayoutSetting(
+            boardLayoutSetting: newLayoutSetting,
+          );
+        },
+        orElse: () {},
       );
-
-      return databaseController.updateLayoutSetting(
-        boardLayoutSetting: newLayoutSetting,
+    } else {
+      await groupBackendSvc.updateGroup(
+        groupId: group.groupId,
+        visible: isVisible,
       );
     }
-
-    await groupBackendSvc.updateGroup(
-      fieldId: groupControllers.values.first.group.fieldId,
-      groupId: group.groupId,
-      visible: isVisible,
-    );
   }
 
   void _reorderGroup(
@@ -275,6 +334,18 @@ class BoardBloc extends Bloc<BoardEvent, BoardState> {
     for (final controller in groupControllers.values) {
       await controller.dispose();
     }
+
+    databaseController.removeListener(
+      onDatabaseChanged: _databaseCallbacks,
+      onLayoutSettingsChanged: _layoutSettingsCallback,
+      onGroupChanged: _groupCallbacks,
+    );
+
+    _databaseCallbacks = null;
+    _layoutSettingsCallback = null;
+    _groupCallbacks = null;
+
+    boardController.dispose();
     return super.close();
   }
 
@@ -282,11 +353,13 @@ class BoardBloc extends Bloc<BoardEvent, BoardState> {
       databaseController.databaseLayoutSetting?.board.hideUngroupedColumn ??
       false;
 
-  FieldType get groupingFieldType {
-    final fieldInfo =
-        databaseController.fieldController.getField(groupList.first.fieldId)!;
-
-    return fieldInfo.fieldType;
+  FieldType? get groupingFieldType {
+    if (groupList.isEmpty) {
+      return null;
+    }
+    return databaseController.fieldController
+        .getField(groupList.first.fieldId)
+        ?.fieldType;
   }
 
   void initializeGroups(List<GroupPB> groups) {
@@ -319,17 +392,10 @@ class BoardBloc extends Bloc<BoardEvent, BoardState> {
     }
   }
 
-  RowCache? getRowCache() => databaseController.rowCache;
+  RowCache get rowCache => databaseController.rowCache;
 
   void _startListening() {
-    final onDatabaseChanged = DatabaseCallbacks(
-      onDatabaseChanged: (database) {
-        if (!isClosed) {
-          add(BoardEvent.didReceiveGridUpdate(database));
-        }
-      },
-    );
-    final onLayoutSettingsChanged = DatabaseLayoutSettingCallbacks(
+    _layoutSettingsCallback = DatabaseLayoutSettingCallbacks(
       onLayoutSettingsChanged: (layoutSettings) {
         if (isClosed) {
           return;
@@ -352,7 +418,7 @@ class BoardBloc extends Bloc<BoardEvent, BoardState> {
         add(BoardEvent.didUpdateLayoutSettings(layoutSettings.board));
       },
     );
-    final onGroupChanged = GroupCallbacks(
+    _groupCallbacks = GroupCallbacks(
       onGroupByField: (groups) {
         if (isClosed) {
           return;
@@ -383,21 +449,30 @@ class BoardBloc extends Bloc<BoardEvent, BoardState> {
         groupList.insert(insertGroups.index, group);
         add(BoardEvent.didReceiveGroups(groupList));
       },
-      onUpdateGroup: (updatedGroups) {
+      onUpdateGroup: (updatedGroups) async {
         if (isClosed) {
           return;
         }
 
+        // workaround: update group most of the time gets called before fields in
+        // field controller are updated. For single and multi-select group
+        // renames, this is required before generating the new group name.
+        await Future.delayed(const Duration(milliseconds: 50));
+
         for (final group in updatedGroups) {
           // see if the column is already in the board
-
           final index = groupList.indexWhere((g) => g.groupId == group.groupId);
-          if (index == -1) continue;
+          if (index == -1) {
+            continue;
+          }
+
           final columnController =
               boardController.getGroupController(group.groupId);
           if (columnController != null) {
             // remove the group or update its name
-            columnController.updateGroupName(group.groupName);
+            columnController.updateGroupName(
+              group.generateGroupName(databaseController),
+            );
             if (!group.isVisible) {
               boardController.removeGroup(group.groupId);
             }
@@ -405,7 +480,7 @@ class BoardBloc extends Bloc<BoardEvent, BoardState> {
             final newGroup = _initializeGroupData(group);
             final visibleGroups = [...groupList]..retainWhere(
                 (g) =>
-                    g.isVisible ||
+                    (g.isVisible && !g.isDefault) ||
                     g.isDefault && !hideUngrouped ||
                     g.groupId == group.groupId,
               );
@@ -422,11 +497,20 @@ class BoardBloc extends Bloc<BoardEvent, BoardState> {
         add(BoardEvent.didReceiveGroups(groupList));
       },
     );
+    _databaseCallbacks = DatabaseCallbacks(
+      onRowsCreated: (rows) {
+        for (final row in rows) {
+          if (!isClosed && row.isHiddenInView) {
+            add(BoardEvent.openRowDetail(row.rowMeta));
+          }
+        }
+      },
+    );
 
     databaseController.addListener(
-      onDatabaseChanged: onDatabaseChanged,
-      onLayoutSettingsChanged: onLayoutSettingsChanged,
-      onGroupChanged: onGroupChanged,
+      onDatabaseChanged: _databaseCallbacks,
+      onLayoutSettingsChanged: _layoutSettingsCallback,
+      onGroupChanged: _groupCallbacks,
     );
   }
 
@@ -442,31 +526,20 @@ class BoardBloc extends Bloc<BoardEvent, BoardState> {
     return <AppFlowyGroupItem>[...items];
   }
 
-  Future<void> _openGrid(Emitter<BoardState> emit) async {
-    final result = await databaseController.open();
-    result.fold(
-      (grid) {
-        databaseController.setIsLoading(false);
-        emit(
-          state.copyWith(
-            loadingState: LoadingState.finish(FlowyResult.success(null)),
-          ),
+  Future<void> _openDatabase(Emitter<BoardState> emit) {
+    return databaseController.open().fold(
+          (datbasePB) => databaseController.setIsLoading(false),
+          (err) => emit(BoardState.error(error: err)),
         );
-      },
-      (err) => emit(
-        state.copyWith(
-          loadingState: LoadingState.finish(FlowyResult.failure(err)),
-        ),
-      ),
-    );
   }
 
   GroupController _initializeGroupController(GroupPB group) {
+    group.freeze();
+
     final delegate = GroupControllerDelegateImpl(
       controller: boardController,
       fieldController: fieldController,
-      onNewColumnItem: (groupId, row, index) =>
-          add(BoardEvent.didCreateRow(group, row, index)),
+      onNewColumnItem: (groupId, row, index) {},
     );
 
     final controller = GroupController(
@@ -491,7 +564,7 @@ class BoardBloc extends Bloc<BoardEvent, BoardState> {
   AppFlowyGroupData _initializeGroupData(GroupPB group) {
     return AppFlowyGroupData(
       id: group.groupId,
-      name: group.groupName,
+      name: group.generateGroupName(databaseController),
       items: _buildGroupItems(group),
       customData: GroupData(
         group: group,
@@ -504,71 +577,84 @@ class BoardBloc extends Bloc<BoardEvent, BoardState> {
 @freezed
 class BoardEvent with _$BoardEvent {
   const factory BoardEvent.initial() = _InitialBoard;
-  const factory BoardEvent.createBottomRow(String groupId) = _CreateBottomRow;
-  const factory BoardEvent.createHeaderRow(String groupId) = _CreateHeaderRow;
+  const factory BoardEvent.createRow(
+    String groupId,
+    OrderObjectPositionTypePB position,
+    String? title,
+    String? targetRowId,
+  ) = _CreateRow;
   const factory BoardEvent.createGroup(String name) = _CreateGroup;
   const factory BoardEvent.startEditingHeader(String groupId) =
       _StartEditingHeader;
   const factory BoardEvent.endEditingHeader(String groupId, String? groupName) =
       _EndEditingHeader;
-  const factory BoardEvent.didCreateRow(
-    GroupPB group,
-    RowMetaPB row,
-    int? index,
-  ) = _DidCreateRow;
-  const factory BoardEvent.startEditingRow(
-    GroupPB group,
-    RowMetaPB row,
-  ) = _StartEditRow;
-  const factory BoardEvent.endEditingRow(RowId rowId) = _EndEditRow;
-  const factory BoardEvent.toggleGroupVisibility(
+  const factory BoardEvent.setGroupVisibility(
     GroupPB group,
     bool isVisible,
-  ) = _ToggleGroupVisibility;
+  ) = _SetGroupVisibility;
   const factory BoardEvent.toggleHiddenSectionVisibility(bool isVisible) =
       _ToggleHiddenSectionVisibility;
+  const factory BoardEvent.renameGroup(String groupId, String name) =
+      _RenameGroup;
   const factory BoardEvent.deleteGroup(String groupId) = _DeleteGroup;
   const factory BoardEvent.reorderGroup(String fromGroupId, String toGroupId) =
       _ReorderGroup;
   const factory BoardEvent.didReceiveError(FlowyError error) = _DidReceiveError;
-  const factory BoardEvent.didReceiveGridUpdate(
-    DatabasePB grid,
-  ) = _DidReceiveGridUpdate;
   const factory BoardEvent.didReceiveGroups(List<GroupPB> groups) =
       _DidReceiveGroups;
   const factory BoardEvent.didUpdateLayoutSettings(
     BoardLayoutSettingPB layoutSettings,
   ) = _DidUpdateLayoutSettings;
+  const factory BoardEvent.deleteCards(List<GroupedRowId> groupedRowIds) =
+      _DeleteCards;
+  const factory BoardEvent.moveGroupToAdjacentGroup(
+    GroupedRowId groupedRowId,
+    bool toPrevious,
+  ) = _MoveGroupToAdjacentGroup;
+  const factory BoardEvent.openRowDetail(RowMetaPB rowMeta) = _OpenRowDetail;
 }
 
 @freezed
 class BoardState with _$BoardState {
-  const factory BoardState({
+  const BoardState._();
+
+  const factory BoardState.loading() = _BoardLoadingState;
+
+  const factory BoardState.error({
+    required FlowyError error,
+  }) = _BoardErrorState;
+
+  const factory BoardState.ready({
     required String viewId,
-    required DatabasePB? grid,
     required List<String> groupIds,
-    required bool isEditingHeader,
-    required bool isEditingRow,
     required LoadingState loadingState,
     required FlowyError? noneOrError,
     required BoardLayoutSettingPB? layoutSettings,
-    String? editingHeaderId,
-    BoardEditingRow? editingRow,
-    RowMetaPB? recentAddedRowMeta,
     required List<GroupPB> hiddenGroups,
-  }) = _BoardState;
+    String? editingHeaderId,
+  }) = _BoardReadyState;
 
-  factory BoardState.initial(String viewId) => BoardState(
-        grid: null,
+  const factory BoardState.setFocus({
+    required List<GroupedRowId> groupedRowIds,
+  }) = _BoardSetFocusState;
+
+  const factory BoardState.openRowDetail({
+    required RowMetaPB rowMeta,
+  }) = _BoardOpenRowDetailState;
+
+  factory BoardState.initial(String viewId) => BoardState.ready(
         viewId: viewId,
         groupIds: [],
-        isEditingHeader: false,
-        isEditingRow: false,
         noneOrError: null,
         loadingState: const LoadingState.loading(),
         layoutSettings: null,
         hiddenGroups: [],
       );
+
+  bool get isLoading => maybeMap(loading: (_) => true, orElse: () => false);
+  bool get isError => maybeMap(error: (_) => true, orElse: () => false);
+  bool get isReady => maybeMap(ready: (_) => true, orElse: () => false);
+  bool get isSetFocus => maybeMap(setFocus: (_) => true, orElse: () => false);
 }
 
 List<GroupPB> _filterHiddenGroups(bool hideUngrouped, List<GroupPB> groups) {
@@ -581,16 +667,30 @@ class GroupItem extends AppFlowyGroupItem {
   GroupItem({
     required this.row,
     required this.fieldInfo,
-    bool draggable = true,
-  }) {
-    super.draggable = draggable;
-  }
+  });
 
   final RowMetaPB row;
   final FieldInfo fieldInfo;
 
   @override
   String get id => row.id.toString();
+}
+
+/// Identifies a card in a database view that has grouping. To support cases
+/// in which a card can belong to more than one group at the same time (e.g.
+/// FieldType.Multiselect), we include the card's group id as well.
+///
+class GroupedRowId extends Equatable {
+  const GroupedRowId({
+    required this.rowId,
+    required this.groupId,
+  });
+
+  final String rowId;
+  final String groupId;
+
+  @override
+  List<Object?> get props => [rowId, groupId];
 }
 
 class GroupControllerDelegateImpl extends GroupControllerDelegate {
@@ -656,7 +756,7 @@ class GroupControllerDelegateImpl extends GroupControllerDelegate {
       return Log.warn("fieldInfo should not be null");
     }
 
-    final item = GroupItem(row: row, fieldInfo: fieldInfo, draggable: false);
+    final item = GroupItem(row: row, fieldInfo: fieldInfo);
 
     if (index != null) {
       controller.insertGroupItem(group.groupId, index, item);
@@ -668,20 +768,8 @@ class GroupControllerDelegateImpl extends GroupControllerDelegate {
   }
 }
 
-class BoardEditingRow {
-  BoardEditingRow({
-    required this.group,
-    required this.row,
-    required this.index,
-  });
-
-  GroupPB group;
-  RowMetaPB row;
-  int? index;
-}
-
 class GroupData {
-  GroupData({
+  const GroupData({
     required this.group,
     required this.fieldInfo,
   });
@@ -703,4 +791,22 @@ class CheckboxGroup {
   // Hardcode value: "Yes" that equal to the value defined in Rust
   // pub const CHECK: &str = "Yes";
   bool get isCheck => group.groupId == "Yes";
+}
+
+enum DidCreateRowAction {
+  none,
+  openAsPage,
+  startEditing,
+}
+
+class DidCreateRowResult {
+  DidCreateRowResult({
+    required this.action,
+    required this.rowMeta,
+    required this.groupId,
+  });
+
+  final DidCreateRowAction action;
+  final RowMetaPB rowMeta;
+  final String groupId;
 }

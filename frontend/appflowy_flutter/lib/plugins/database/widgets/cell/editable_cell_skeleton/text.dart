@@ -58,7 +58,7 @@ class _TextCellState extends GridEditableTextCell<EditableTextCell> {
       widget.databaseController,
       widget.cellContext,
     ).as(),
-  )..add(const TextCellEvent.initial());
+  );
 
   @override
   void initState() {
@@ -79,15 +79,24 @@ class _TextCellState extends GridEditableTextCell<EditableTextCell> {
     return BlocProvider.value(
       value: cellBloc,
       child: BlocListener<TextCellBloc, TextCellState>(
+        listenWhen: (previous, current) => previous.content != current.content,
         listener: (context, state) {
-          _textEditingController.text = state.content;
+          // It's essential to set the new content to the textEditingController.
+          // If you don't, the old value in textEditingController will persist and
+          // overwrite the correct value, leading to inconsistencies between the
+          // displayed text and the actual data.
+          _textEditingController.text = state.content ?? "";
         },
-        child: widget.skin.build(
-          context,
-          widget.cellContainerNotifier,
-          cellBloc,
-          focusNode,
-          _textEditingController,
+        child: Builder(
+          builder: (context) {
+            return widget.skin.build(
+              context,
+              widget.cellContainerNotifier,
+              cellBloc,
+              focusNode,
+              _textEditingController,
+            );
+          },
         ),
       ),
     );

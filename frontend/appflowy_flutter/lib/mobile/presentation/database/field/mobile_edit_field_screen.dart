@@ -1,12 +1,13 @@
+import 'package:flutter/material.dart';
+
 import 'package:appflowy/generated/locale_keys.g.dart';
-import 'package:appflowy/mobile/presentation/base/app_bar.dart';
+import 'package:appflowy/mobile/presentation/base/app_bar/app_bar.dart';
 import 'package:appflowy/mobile/presentation/database/field/mobile_full_field_editor.dart';
-import 'package:appflowy/plugins/database/domain/field_backend_service.dart';
 import 'package:appflowy/plugins/database/application/field/field_info.dart';
+import 'package:appflowy/plugins/database/domain/field_backend_service.dart';
 import 'package:appflowy/plugins/database/domain/field_service.dart';
 import 'package:appflowy/plugins/database/widgets/setting/field_visibility_extension.dart';
 import 'package:easy_localization/easy_localization.dart';
-import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 class MobileEditPropertyScreen extends StatefulWidget {
@@ -49,7 +50,7 @@ class _MobileEditPropertyScreenState extends State<MobileEditPropertyScreen> {
 
     return PopScope(
       onPopInvoked: (didPop) {
-        if (didPop) {
+        if (!didPop) {
           context.pop(_fieldOptionValues);
         }
       },
@@ -63,7 +64,7 @@ class _MobileEditPropertyScreenState extends State<MobileEditPropertyScreen> {
           isPrimary: widget.field.isPrimary,
           defaultValues: FieldOptionValues.fromField(field: widget.field.field),
           actions: [
-            widget.field.fieldSettings?.visibility.isVisibleState() ?? true
+            widget.field.visibility?.isVisibleState() ?? true
                 ? FieldOptionAction.hide
                 : FieldOptionAction.show,
             FieldOptionAction.duplicate,

@@ -8,7 +8,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 SelectionMenuItem emojiMenuItem = SelectionMenuItem(
-  getName: () => LocaleKeys.document_plugins_emoji.tr(),
+  getName: LocaleKeys.document_plugins_emoji.tr,
   icon: (editorState, onSelected, style) => SelectableIconWidget(
     icon: Icons.emoji_emotions_outlined,
     isSelected: onSelected,
@@ -85,8 +85,8 @@ class EmojiSelectionMenu extends StatefulWidget {
 class _EmojiSelectionMenuState extends State<EmojiSelectionMenu> {
   @override
   void initState() {
-    HardwareKeyboard.instance.addHandler(_handleGlobalKeyEvent);
     super.initState();
+    HardwareKeyboard.instance.addHandler(_handleGlobalKeyEvent);
   }
 
   bool _handleGlobalKeyEvent(KeyEvent event) {
@@ -95,9 +95,8 @@ class _EmojiSelectionMenuState extends State<EmojiSelectionMenu> {
       //triggers on esc
       widget.onExit();
       return true;
-    } else {
-      return false;
     }
+    return false;
   }
 
   @override
@@ -107,16 +106,9 @@ class _EmojiSelectionMenuState extends State<EmojiSelectionMenu> {
   }
 
   @override
-  void dispose() {
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
     return FlowyEmojiPicker(
-      onEmojiSelected: (_, emoji) {
-        widget.onSubmitted(emoji);
-      },
+      onEmojiSelected: (r) => widget.onSubmitted(r.emoji),
     );
   }
 }

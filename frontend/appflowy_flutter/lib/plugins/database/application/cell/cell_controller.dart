@@ -3,10 +3,8 @@ import 'dart:async';
 import 'package:appflowy/plugins/database/application/field/field_controller.dart';
 import 'package:appflowy/plugins/database/application/field/field_info.dart';
 import 'package:appflowy/plugins/database/domain/cell_listener.dart';
-import 'package:appflowy/plugins/database/domain/field_listener.dart';
 import 'package:appflowy/plugins/database/application/field/type_option/type_option_data_parser.dart';
 import 'package:appflowy/plugins/database/application/row/row_cache.dart';
-import 'package:appflowy/plugins/database/domain/row_meta_listener.dart';
 import 'package:appflowy/plugins/database/application/row/row_service.dart';
 import 'package:appflowy_backend/log.dart';
 import 'package:appflowy_backend/protobuf/flowy-database2/protobuf.dart';
@@ -49,7 +47,6 @@ class CellController<T, D> {
         _rowCache = rowCache,
         _cellDataLoader = cellDataLoader,
         _cellDataPersistence = cellDataPersistence,
-        _fieldListener = SingleFieldListener(fieldId: cellContext.fieldId),
         _cellDataNotifier =
             CellDataNotifier(value: rowCache.cellCache.get(cellContext)) {
     _startListening();
@@ -63,22 +60,21 @@ class CellController<T, D> {
   final CellDataPersistence<D> _cellDataPersistence;
 
   CellListener? _cellListener;
-  RowMetaListener? _rowMetaListener;
-  SingleFieldListener? _fieldListener;
   CellDataNotifier<T?>? _cellDataNotifier;
 
-  void Function(FieldPB field)? _onCellFieldChanged;
-  VoidCallback? _onRowMetaChanged;
   Timer? _loadDataOperation;
   Timer? _saveDataOperation;
+
+  Completer? _completer;
 
   RowId get rowId => _cellContext.rowId;
   String get fieldId => _cellContext.fieldId;
   FieldInfo get fieldInfo => _fieldController.getField(_cellContext.fieldId)!;
   FieldType get fieldType =>
       _fieldController.getField(_cellContext.fieldId)!.fieldType;
-  RowMetaPB? get rowMeta => _rowCache.getRow(rowId)?.rowMeta;
-  String? get icon => rowMeta?.icon;
+  ValueNotifier<String>? get icon => _rowCache.getRow(rowId)?.rowIconNotifier;
+  ValueNotifier<bool>? get hasDocument =>
+      _rowCache.getRow(rowId)?.rowDocumentNotifier;
   CellMemCache get _cellCache => _rowCache.cellCache;
 
   /// casting method for painless type coersion
@@ -105,49 +101,55 @@ class CellController<T, D> {
     );
 
     // 2. Listen on the field event and load the cell data if needed.
-    _fieldListener?.start(
-      onFieldChanged: (fieldPB) {
-        // reloadOnFieldChanged should be true if you want to reload the cell
-        // data when the corresponding field is changed.
-        // For example:
-        //   ￥12 -> $12
-        if (_cellDataLoader.reloadOnFieldChange) {
-          _loadData();
-        }
-        _onCellFieldChanged?.call(fieldPB);
-      },
+    _fieldController.addSingleFieldListener(
+      fieldId,
+      onFieldChanged: _onFieldChangedListener,
     );
-
-    // 3. If the field is primary listen to row meta changes.
-    if (fieldInfo.field.isPrimary) {
-      _rowMetaListener = RowMetaListener(_cellContext.rowId);
-      _rowMetaListener?.start(
-        callback: (newRowMeta) {
-          _onRowMetaChanged?.call();
-        },
-      );
-    }
   }
 
   /// Add a new listener
   VoidCallback? addListener({
     required void Function(T?) onCellChanged,
-    void Function(FieldPB field)? onCellFieldChanged,
-    VoidCallback? onRowMetaChanged,
+    void Function(FieldInfo fieldInfo)? onFieldChanged,
   }) {
-    _onCellFieldChanged = onCellFieldChanged;
-    _onRowMetaChanged = onRowMetaChanged;
-
-    /// Notify the listener, the cell data was changed.
+    /// an adaptor for the onCellChanged listener
     void onCellChangedFn() => onCellChanged(_cellDataNotifier?.value);
     _cellDataNotifier?.addListener(onCellChangedFn);
+
+    if (onFieldChanged != null) {
+      _fieldController.addSingleFieldListener(
+        fieldId,
+        onFieldChanged: onFieldChanged,
+      );
+    }
 
     // Return the function pointer that can be used when calling removeListener.
     return onCellChangedFn;
   }
 
-  void removeListener(VoidCallback fn) {
-    _cellDataNotifier?.removeListener(fn);
+  void removeListener({
+    required VoidCallback onCellChanged,
+    void Function(FieldInfo fieldInfo)? onFieldChanged,
+    VoidCallback? onRowMetaChanged,
+  }) {
+    _cellDataNotifier?.removeListener(onCellChanged);
+
+    if (onFieldChanged != null) {
+      _fieldController.removeSingleFieldListener(
+        fieldId: fieldId,
+        onFieldChanged: onFieldChanged,
+      );
+    }
+  }
+
+  void _onFieldChangedListener(FieldInfo fieldInfo) {
+    // reloadOnFieldChanged should be true if you want to reload the cell
+    // data when the corresponding field is changed.
+    // For example:
+    //   ￥12 -> $12
+    if (_cellDataLoader.reloadOnFieldChange) {
+      _loadData();
+    }
   }
 
   /// Get the cell data. The cell data will be read from the cache first,
@@ -163,7 +165,7 @@ class CellController<T, D> {
 
   /// Return the TypeOptionPB that can be parsed into corresponding class using the [parser].
   /// [PD] is the type that the parser return.
-  PD getTypeOption<PD, P extends TypeOptionParser>(P parser) {
+  PD getTypeOption<PD>(TypeOptionParser parser) {
     return parser.fromBuffer(fieldInfo.field.typeOptionData);
   }
 
@@ -177,6 +179,7 @@ class CellController<T, D> {
     _loadDataOperation?.cancel();
     if (debounce) {
       _saveDataOperation?.cancel();
+      _completer = Completer();
       _saveDataOperation = Timer(const Duration(milliseconds: 300), () async {
         final result = await _cellDataPersistence.save(
           viewId: viewId,
@@ -184,6 +187,7 @@ class CellController<T, D> {
           data: data,
         );
         onFinish?.call(result);
+        _completer?.complete();
       });
     } else {
       final result = await _cellDataPersistence.save(
@@ -214,20 +218,19 @@ class CellController<T, D> {
   }
 
   Future<void> dispose() async {
-    await _rowMetaListener?.stop();
-    _rowMetaListener = null;
-
     await _cellListener?.stop();
     _cellListener = null;
 
-    await _fieldListener?.stop();
-    _fieldListener = null;
+    _fieldController.removeSingleFieldListener(
+      fieldId: fieldId,
+      onFieldChanged: _onFieldChangedListener,
+    );
 
     _loadDataOperation?.cancel();
+    await _completer?.future;
     _saveDataOperation?.cancel();
     _cellDataNotifier?.dispose();
     _cellDataNotifier = null;
-    _onRowMetaChanged = null;
   }
 }
 
@@ -238,15 +241,11 @@ class CellDataNotifier<T> extends ChangeNotifier {
   bool Function(T? oldValue, T? newValue)? listenWhen;
 
   set value(T newValue) {
-    if (listenWhen?.call(_value, newValue) ?? false) {
-      _value = newValue;
-      notifyListeners();
-    } else {
-      if (_value != newValue) {
-        _value = newValue;
-        notifyListeners();
-      }
+    if (listenWhen != null && !listenWhen!.call(_value, newValue)) {
+      return;
     }
+    _value = newValue;
+    notifyListeners();
   }
 
   T get value => _value;

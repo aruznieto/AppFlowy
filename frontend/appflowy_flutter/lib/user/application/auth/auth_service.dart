@@ -5,8 +5,6 @@ import 'package:appflowy_result/appflowy_result.dart';
 class AuthServiceMapKeys {
   const AuthServiceMapKeys._();
 
-  // for supabase auth use only.
-  static const String uuid = 'uuid';
   static const String email = 'email';
   static const String deviceId = 'device_id';
   static const String signInURL = 'sign_in_url';
@@ -72,7 +70,7 @@ abstract class AuthService {
   /// - `params`: Additional parameters for authentication with magic link (optional).
   ///
   /// Returns [UserProfilePB] if the user is authenticated, otherwise returns [FlowyError].
-  Future<FlowyResult<UserProfilePB, FlowyError>> signInWithMagicLink({
+  Future<FlowyResult<void, FlowyError>> signInWithMagicLink({
     required String email,
     Map<String, String> params,
   });

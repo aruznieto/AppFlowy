@@ -43,10 +43,10 @@
     "unmatchedPasswordError": "As palavras-passes não conferem.",
     "syncPromptMessage": "A sincronização dos dados pode demorar um pouco. Por favor não feche esta página",
     "or": "OU",
+    "signInWith": "Entrar com:",
     "LogInWithGoogle": "Iniciar sessão com o Google",
     "LogInWithGithub": "Iniciar sessão com o Github",
     "LogInWithDiscord": "Iniciar sessão com o Discord",
-    "signInWith": "Entrar com:",
     "loginAsGuestButtonText": "Iniciar"
   },
   "workspace": {
@@ -56,7 +56,7 @@
     "resetWorkspacePrompt": "Reinciar do espaço de trabalho excluirá todas as páginas e dados contidos. Tem certeza de que deseja reiniciar o espaço de trabalho? Alternativamente, podes entrar em contato com a equipe de suporte para restaurar o espaço de trabalho",
     "hint": "ambiente de trabalho",
     "notFoundError": "Ambiente de trabalho não encontrada",
-    "failedToLoad": "Algo correu mal! Falha ao carregar o espaço de trabalho. Tente fechar qualquer instância aberta do AppFlowy e tente novamente.",
+    "failedToLoad": "Algo correu mal! Falha ao carregar o espaço de trabalho. Tente fechar qualquer instância aberta do @:appName e tente novamente.",
     "errorActions": {
       "reportIssue": "Relatar problema",
       "reachOut": "Entre em contacto no Discord"
@@ -255,8 +255,7 @@
       "inputTextFieldHint": "A sua palavra-chave",
       "historicalUserList": "Histórico de login do utilizador",
       "historicalUserListTooltip": "Esta lista mostrs suas contas anónimas. Pode clicar numa conta para ver os detalhes. Contas anónimas são criadas clicando no botão ‘Começar’",
-      "openHistoricalUser": "Clique para abrir a conta anónima",
-      "supabaseSetting": "Configuração de Supabase"
+      "openHistoricalUser": "Clique para abrir a conta anónima"
     },
     "notifications": {
       "enableNotifications": {
@@ -293,7 +292,7 @@
       "themeUpload": {
         "button": "Carregar",
         "uploadTheme": "Carregar tema",
-        "description": "Carregue seu próprio tema AppFlowy usando o botão abaixo.",
+        "description": "Carregue seu próprio tema @:appName usando o botão abaixo.",
         "loading": "Aguarde enquanto validamos e carregamos seu tema...",
         "uploadSuccess": "Seu tema foi carregado com sucesso",
         "deletionFailure": "Falha ao excluir o tema. Tente excluí-lo manualmente.",
@@ -326,7 +325,7 @@
       "defaultLocation": "Leia arquivos e local de armazenamento de dados",
       "exportData": "Exporte seus dados",
       "doubleTapToCopy": "Toque duas vezes para copiar o caminho",
-      "restoreLocation": "Restaurar para o caminho padrão do AppFlowy",
+      "restoreLocation": "Restaurar para o caminho padrão do @:appName",
       "customizeLocation": "Abra outra pasta",
       "restartApp": "Reinicie o aplicativo para que as alterações entrem em vigor.",
       "exportDatabase": "Exportar banco de dados",
@@ -338,10 +337,10 @@
       "defineWhereYourDataIsStored": "Defina onde seus dados são armazenados",
       "open": "Abrir",
       "openFolder": "Abra uma pasta existente",
-      "openFolderDesc": "Leia e grave-o em sua pasta AppFlowy existente",
+      "openFolderDesc": "Leia e grave-o em sua pasta @:appName existente",
       "folderHintText": "nome da pasta",
       "location": "Criando uma nova pasta",
-      "locationDesc": "Escolha um nome para sua pasta de dados do AppFlowy",
+      "locationDesc": "Escolha um nome para sua pasta de dados do @:appName",
       "browser": "Navegar",
       "create": "Criar",
       "set": "Definir",
@@ -352,7 +351,7 @@
       "change": "Mudar",
       "openLocationTooltips": "Abra outro diretório de dados",
       "openCurrentDataFolder": "Abra o diretório de dados atual",
-      "recoverLocationTooltips": "Redefinir para o diretório de dados padrão do AppFlowy",
+      "recoverLocationTooltips": "Redefinir para o diretório de dados padrão do @:appName",
       "exportFileSuccess": "Exportar arquivo com sucesso!",
       "exportFileFail": "Falha na exportação do arquivo!",
       "export": "Exportar"
@@ -362,9 +361,9 @@
       "email": "E-mail",
       "tooltipSelectIcon": "Selecione o ícone",
       "selectAnIcon": "Selecione um ícone",
-      "pleaseInputYourOpenAIKey": "por favor insira sua chave OpenAI",
-      "pleaseInputYourStabilityAIKey": "por favor, insira a sua chave Stability AI",
-      "clickToLogout": "Clique para fazer logout"
+      "pleaseInputYourOpenAIKey": "por favor insira sua chave AI",
+      "clickToLogout": "Clique para fazer logout",
+      "pleaseInputYourStabilityAIKey": "por favor, insira a sua chave Stability AI"
     },
     "shortcuts": {
       "shortcutsLabel": "Atalhos",
@@ -561,23 +560,23 @@
       "referencedBoard": "Conselho Referenciado",
       "referencedGrid": "grade referenciada",
       "referencedCalendar": "calendário referenciado",
-      "autoGeneratorMenuItemName": "OpenAI Writer",
-      "autoGeneratorTitleName": "OpenAI: Peça à IA para escrever qualquer coisa...",
+      "autoGeneratorMenuItemName": "AI Writer",
+      "autoGeneratorTitleName": "AI: Peça à IA para escrever qualquer coisa...",
       "autoGeneratorLearnMore": "Saber mais",
       "autoGeneratorGenerate": "Gerar",
-      "autoGeneratorHintText": "Pergunte ao OpenAI...",
-      "autoGeneratorCantGetOpenAIKey": "Não é possível obter a chave OpenAI",
+      "autoGeneratorHintText": "Pergunte ao AI...",
+      "autoGeneratorCantGetOpenAIKey": "Não é possível obter a chave AI",
       "autoGeneratorRewrite": "Reescrever",
       "smartEdit": "Assistentes de IA",
-      "openAI": "OpenAI",
+      "aI": "AI",
       "smartEditFixSpelling": "corrigir ortografia",
       "warning": "⚠️ As respostas da IA podem ser imprecisas ou enganosas.",
       "smartEditSummarize": "Resumir",
       "smartEditImproveWriting": "melhorar a escrita",
       "smartEditMakeLonger": "Faça mais",
-      "smartEditCouldNotFetchResult": "Não foi possível obter o resultado do OpenAI",
-      "smartEditCouldNotFetchKey": "Não foi possível obter a chave OpenAI",
-      "smartEditDisabled": "Conecte OpenAI em Configurações",
+      "smartEditCouldNotFetchResult": "Não foi possível obter o resultado do AI",
+      "smartEditCouldNotFetchKey": "Não foi possível obter a chave AI",
+      "smartEditDisabled": "Conecte AI em Configurações",
       "discardResponse": "Deseja descartar as respostas de IA?",
       "createInlineMathEquation": "Criar equação",
       "toggleList": "Alternar lista",
@@ -625,8 +624,8 @@
         "defaultColor": "Padrão"
       },
       "image": {
-        "copiedToPasteBoard": "O link da imagem foi copiado para a área de transferência",
-        "addAnImage": "Adicione uma imagem"
+        "addAnImage": "Adicione uma imagem",
+        "copiedToPasteBoard": "O link da imagem foi copiado para a área de transferência"
       },
       "outline": {
         "addHeadingToCreateOutline": "Adicione títulos para criar um sumário."
@@ -662,8 +661,8 @@
         "placeholder": "Insira o URL da imagem"
       },
       "ai": {
-        "label": "Gerar imagem da OpenAI",
-        "placeholder": "Por favor, insira o comando para a OpenAI gerar a imagem"
+        "label": "Gerar imagem da AI",
+        "placeholder": "Por favor, insira o comando para a AI gerar a imagem"
       },
       "stability_ai": {
         "label": "Gerar imagem da Stability AI",
@@ -681,7 +680,7 @@
         "placeholder": "Cole ou digite uma hiperligação de imagem"
       },
       "searchForAnImage": "Procure uma imagem",
-      "pleaseInputYourOpenAIKey": "por favor, insira a sua chave OpenAI na página Configurações",
+      "pleaseInputYourOpenAIKey": "por favor, insira a sua chave AI na página Configurações",
       "pleaseInputYourStabilityAIKey": "por favor, insira a sua chave Stability AI na página Configurações"
     },
     "codeBlock": {
@@ -724,7 +723,12 @@
       "createNewCard": "Novo"
     },
     "menuName": "Quadro",
-    "referencedBoardPrefix": "Vista de"
+    "referencedBoardPrefix": "Vista de",
+    "mobile": {
+      "showGroup": "Mostrar grupo",
+      "showGroupContent": "Tem certeza de que deseja mostrar este grupo no quadro?",
+      "failedToLoad": "Falha ao carregar a visualização do quadro"
+    }
   },
   "calendar": {
     "menuName": "Calendário",
@@ -749,7 +753,7 @@
     "referencedCalendarPrefix": "Vista de"
   },
   "errorDialog": {
-    "title": "Erro do AppFlowy",
+    "title": "Erro do @:appName",
     "howToFixFallback": "Lamentamos o inconveniente! Envie um problema em nossa página do GitHub que descreva seu erro.",
     "github": "Ver no GitHub"
   },
