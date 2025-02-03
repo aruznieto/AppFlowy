@@ -5,15 +5,21 @@ import 'package:appflowy/workspace/application/settings/appflowy_cloud_urls_bloc
 import 'package:appflowy_backend/log.dart';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
+
+enum SelfHostUrlBottomSheetType {
+  shareDomain,
+  cloudURL,
+}
 
 class SelfHostUrlBottomSheet extends StatefulWidget {
   const SelfHostUrlBottomSheet({
     super.key,
     required this.url,
+    required this.type,
   });
 
   final String url;
+  final SelfHostUrlBottomSheetType type;
 
   @override
   State<SelfHostUrlBottomSheet> createState() => _SelfHostUrlBottomSheetState();
@@ -38,40 +44,19 @@ class _SelfHostUrlBottomSheetState extends State<SelfHostUrlBottomSheet> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: <Widget>[
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text(
-              LocaleKeys.editor_urlHint.tr(),
-              style: theme.textTheme.labelSmall,
-            ),
-            IconButton(
-              icon: Icon(
-                Icons.close,
-                color: theme.hintColor,
-              ),
-              onPressed: () {
-                context.pop();
-              },
-            ),
-          ],
-        ),
-        const SizedBox(
-          height: 16,
-        ),
         Form(
           key: _formKey,
           child: TextFormField(
             controller: _textFieldController,
             keyboardType: TextInputType.text,
             validator: (value) {
-              if (value == null || value.isEmpty) {
-                return LocaleKeys.settings_mobile_usernameEmptyError.tr();
+              if (value == null ||
+                  value.isEmpty ||
+                  validateUrl(value).isFailure) {
+                return LocaleKeys.settings_menu_invalidCloudURLScheme.tr();
               }
               return null;
             },
@@ -98,7 +83,12 @@ class _SelfHostUrlBottomSheetState extends State<SelfHostUrlBottomSheet> {
       if (value.isNotEmpty) {
         validateUrl(value).fold(
           (url) async {
-            await useSelfHostedAppFlowyCloudWithURL(url);
+            switch (widget.type) {
+              case SelfHostUrlBottomSheetType.shareDomain:
+                await useBaseWebDomain(url);
+              case SelfHostUrlBottomSheetType.cloudURL:
+                await useSelfHostedAppFlowyCloudWithURL(url);
+            }
             await runAppFlowy();
           },
           (err) => Log.error(err),

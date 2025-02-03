@@ -1,36 +1,64 @@
-use anyhow::Error;
-use collab::core::collab::CollabDocState;
+use collab::entity::EncodedCollab;
+use collab_database::database::default_database_data;
+use collab_database::workspace_database::default_workspace_database_data;
+use collab_document::document_data::default_document_collab_data;
 use collab_entity::CollabType;
-
-use flowy_database_pub::cloud::{CollabDocStateByOid, DatabaseCloudService, DatabaseSnapshot};
-use lib_infra::future::FutureResult;
+use collab_user::core::default_user_awareness_data;
+use flowy_database_pub::cloud::{DatabaseCloudService, DatabaseSnapshot, EncodeCollabByOid};
+use flowy_error::FlowyError;
+use lib_infra::async_trait::async_trait;
 
 pub(crate) struct LocalServerDatabaseCloudServiceImpl();
 
+#[async_trait]
 impl DatabaseCloudService for LocalServerDatabaseCloudServiceImpl {
-  fn get_database_object_doc_state(
+  async fn get_database_encode_collab(
+    &self,
+    object_id: &str,
+    collab_type: CollabType,
+    _workspace_id: &str,
+  ) -> Result<Option<EncodedCollab>, FlowyError> {
+    match collab_type {
+      CollabType::Document => {
+        let encode_collab = default_document_collab_data(object_id)?;
+        Ok(Some(encode_collab))
+      },
+      CollabType::Database => default_database_data(object_id)
+        .await
+        .map(Some)
+        .map_err(Into::into),
+      CollabType::WorkspaceDatabase => Ok(Some(default_workspace_database_data(object_id))),
+      CollabType::Folder => Ok(None),
+      CollabType::DatabaseRow => Ok(None),
+      CollabType::UserAwareness => Ok(Some(default_user_awareness_data(object_id))),
+      CollabType::Unknown => Ok(None),
+    }
+  }
+
+  async fn create_database_encode_collab(
     &self,
     _object_id: &str,
     _collab_type: CollabType,
     _workspace_id: &str,
-  ) -> FutureResult<CollabDocState, Error> {
-    FutureResult::new(async move { Ok(vec![]) })
+    _encoded_collab: EncodedCollab,
+  ) -> Result<(), FlowyError> {
+    Ok(())
   }
 
-  fn batch_get_database_object_doc_state(
+  async fn batch_get_database_encode_collab(
     &self,
     _object_ids: Vec<String>,
     _object_ty: CollabType,
     _workspace_id: &str,
-  ) -> FutureResult<CollabDocStateByOid, Error> {
-    FutureResult::new(async move { Ok(CollabDocStateByOid::default()) })
+  ) -> Result<EncodeCollabByOid, FlowyError> {
+    Ok(EncodeCollabByOid::default())
   }
 
-  fn get_database_collab_object_snapshots(
+  async fn get_database_collab_object_snapshots(
     &self,
     _object_id: &str,
     _limit: usize,
-  ) -> FutureResult<Vec<DatabaseSnapshot>, Error> {
-    FutureResult::new(async move { Ok(vec![]) })
+  ) -> Result<Vec<DatabaseSnapshot>, FlowyError> {
+    Ok(vec![])
   }
 }

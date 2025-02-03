@@ -3,29 +3,30 @@ import 'package:appflowy/core/network_monitor.dart';
 import 'package:appflowy/env/cloud_env.dart';
 import 'package:appflowy/plugins/document/application/prelude.dart';
 import 'package:appflowy/plugins/document/presentation/editor_plugins/copy_and_paste/clipboard_service.dart';
-import 'package:appflowy/plugins/document/presentation/editor_plugins/openai/service/openai_client.dart';
-import 'package:appflowy/plugins/document/presentation/editor_plugins/stability_ai/stability_ai_client.dart';
+import 'package:appflowy/ai/service/ai_client.dart';
 import 'package:appflowy/plugins/trash/application/prelude.dart';
 import 'package:appflowy/shared/appflowy_cache_manager.dart';
 import 'package:appflowy/shared/custom_image_cache_manager.dart';
 import 'package:appflowy/startup/startup.dart';
 import 'package:appflowy/startup/tasks/appflowy_cloud_task.dart';
+import 'package:appflowy/ai/service/appflowy_ai_service.dart';
 import 'package:appflowy/user/application/auth/af_cloud_auth_service.dart';
 import 'package:appflowy/user/application/auth/auth_service.dart';
-import 'package:appflowy/user/application/auth/supabase_auth_service.dart';
 import 'package:appflowy/user/application/prelude.dart';
 import 'package:appflowy/user/application/reminder/reminder_bloc.dart';
 import 'package:appflowy/user/application/user_listener.dart';
 import 'package:appflowy/user/application/user_service.dart';
 import 'package:appflowy/user/presentation/router.dart';
+import 'package:appflowy/workspace/application/action_navigation/action_navigation_bloc.dart';
 import 'package:appflowy/workspace/application/edit_panel/edit_panel_bloc.dart';
 import 'package:appflowy/workspace/application/favorite/favorite_bloc.dart';
-import 'package:appflowy/workspace/application/notifications/notification_action_bloc.dart';
+import 'package:appflowy/workspace/application/recent/cached_recent_service.dart';
 import 'package:appflowy/workspace/application/settings/appearance/base_appearance.dart';
 import 'package:appflowy/workspace/application/settings/appearance/desktop_appearance.dart';
 import 'package:appflowy/workspace/application/settings/appearance/mobile_appearance.dart';
 import 'package:appflowy/workspace/application/settings/prelude.dart';
 import 'package:appflowy/workspace/application/sidebar/rename_view/rename_view_bloc.dart';
+import 'package:appflowy/workspace/application/subscription_success_listenable/subscription_success_listenable.dart';
 import 'package:appflowy/workspace/application/tabs/tabs_bloc.dart';
 import 'package:appflowy/workspace/application/user/prelude.dart';
 import 'package:appflowy/workspace/application/view/prelude.dart';
@@ -34,13 +35,12 @@ import 'package:appflowy/workspace/presentation/home/menu/menu_shared_state.dart
 import 'package:appflowy_backend/log.dart';
 import 'package:appflowy_backend/protobuf/flowy-folder/view.pb.dart';
 import 'package:appflowy_backend/protobuf/flowy-user/protobuf.dart';
-import 'package:appflowy_editor/appflowy_editor.dart' hide Log;
 import 'package:appflowy_popover/appflowy_popover.dart';
 import 'package:flowy_infra/file_picker/file_picker_impl.dart';
 import 'package:flowy_infra/file_picker/file_picker_service.dart';
 import 'package:fluttertoast/fluttertoast.dart';
 import 'package:get_it/get_it.dart';
-import 'package:http/http.dart' as http;
+import 'package:universal_platform/universal_platform.dart';
 
 class DependencyResolver {
   static Future<void> resolve(
@@ -78,46 +78,17 @@ void _resolveCommonService(
   IntegrationMode mode,
 ) async {
   getIt.registerFactory<FilePickerService>(() => FilePicker());
-  if (mode.isTest) {
-    getIt.registerFactory<ApplicationDataStorage>(
-      () => MockApplicationDataStorage(),
-    );
-  } else {
-    getIt.registerFactory<ApplicationDataStorage>(
-      () => ApplicationDataStorage(),
-    );
-  }
 
-  getIt.registerFactoryAsync<OpenAIRepository>(
-    () async {
-      final result = await UserBackendService.getCurrentUserProfile();
-      return result.fold(
-        (s) {
-          return HttpOpenAIRepository(
-            client: http.Client(),
-            apiKey: s.openaiKey,
-          );
-        },
-        (e) {
-          throw Exception('Failed to get user profile: ${e.msg}');
-        },
-      );
-    },
+  getIt.registerFactory<ApplicationDataStorage>(
+    () => mode.isTest ? MockApplicationDataStorage() : ApplicationDataStorage(),
   );
 
-  getIt.registerFactoryAsync<StabilityAIRepository>(
+  getIt.registerFactoryAsync<AIRepository>(
     () async {
       final result = await UserBackendService.getCurrentUserProfile();
       return result.fold(
-        (s) {
-          return HttpStabilityAIRepository(
-            client: http.Client(),
-            apiKey: s.stabilityAiKey,
-          );
-        },
-        (e) {
-          throw Exception('Failed to get user profile: ${e.msg}');
-        },
+        (s) => AppFlowyAIService(),
+        (e) => throw Exception('Failed to get user profile: ${e.msg}'),
       );
     },
   );
@@ -128,7 +99,7 @@ void _resolveCommonService(
 
   // theme
   getIt.registerFactory<BaseAppearance>(
-    () => PlatformExtension.isMobile ? MobileAppearance() : DesktopAppearance(),
+    () => UniversalPlatform.isMobile ? MobileAppearance() : DesktopAppearance(),
   );
 
   getIt.registerFactory<FlowyCacheManager>(
@@ -147,9 +118,6 @@ void _resolveUserDeps(GetIt getIt, IntegrationMode mode) {
           AuthenticatorPB.Local,
         ),
       );
-      break;
-    case AuthenticatorType.supabase:
-      getIt.registerFactory<AuthService>(() => SupabaseAuthService());
       break;
     case AuthenticatorType.appflowyCloud:
     case AuthenticatorType.appflowyCloudSelfHost:
@@ -171,6 +139,10 @@ void _resolveUserDeps(GetIt getIt, IntegrationMode mode) {
   getIt.registerFactory<EditPanelBloc>(() => EditPanelBloc());
   getIt.registerFactory<SplashBloc>(() => SplashBloc());
   getIt.registerLazySingleton<NetworkListener>(() => NetworkListener());
+  getIt.registerLazySingleton<CachedRecentService>(() => CachedRecentService());
+  getIt.registerLazySingleton<SubscriptionSuccessListenable>(
+    () => SubscriptionSuccessListenable(),
+  );
 }
 
 void _resolveHomeDeps(GetIt getIt) {
@@ -182,18 +154,12 @@ void _resolveHomeDeps(GetIt getIt) {
     (user, _) => UserListener(userProfile: user),
   );
 
-  getIt.registerFactoryParam<WorkspaceBloc, UserProfilePB, void>(
-    (user, _) => WorkspaceBloc(
-      userService: UserBackendService(userId: user.id),
-    ),
-  );
-
   // share
-  getIt.registerFactoryParam<DocShareBloc, ViewPB, void>(
-    (view, _) => DocShareBloc(view: view),
+  getIt.registerFactoryParam<ShareBloc, ViewPB, void>(
+    (view, _) => ShareBloc(view: view),
   );
 
-  getIt.registerSingleton<NotificationActionBloc>(NotificationActionBloc());
+  getIt.registerSingleton<ActionNavigationBloc>(ActionNavigationBloc());
 
   getIt.registerLazySingleton<TabsBloc>(() => TabsBloc());
 
@@ -203,12 +169,10 @@ void _resolveHomeDeps(GetIt getIt) {
 }
 
 void _resolveFolderDeps(GetIt getIt) {
-  //workspace
+  // Workspace
   getIt.registerFactoryParam<WorkspaceListener, UserProfilePB, String>(
-    (user, workspaceId) => WorkspaceListener(
-      user: user,
-      workspaceId: workspaceId,
-    ),
+    (user, workspaceId) =>
+        WorkspaceListener(user: user, workspaceId: workspaceId),
   );
 
   getIt.registerFactoryParam<ViewBloc, ViewPB, void>(
@@ -217,21 +181,18 @@ void _resolveFolderDeps(GetIt getIt) {
     ),
   );
 
-  //Settings
-  getIt.registerFactoryParam<SettingsDialogBloc, UserProfilePB, void>(
-    (user, _) => SettingsDialogBloc(user),
-  );
-
-  //User
+  // User
   getIt.registerFactoryParam<SettingsUserViewBloc, UserProfilePB, void>(
     (user, _) => SettingsUserViewBloc(user),
   );
 
-  // trash
+  // Trash
   getIt.registerLazySingleton<TrashService>(() => TrashService());
   getIt.registerLazySingleton<TrashListener>(() => TrashListener());
   getIt.registerFactory<TrashBloc>(
     () => TrashBloc(),
   );
+
+  // Favorite
   getIt.registerFactory<FavoriteBloc>(() => FavoriteBloc());
 }

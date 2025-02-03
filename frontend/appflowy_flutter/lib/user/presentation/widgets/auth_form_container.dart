@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 
 class AuthFormContainer extends StatelessWidget {
-  const AuthFormContainer({super.key, required this.children});
+  const AuthFormContainer({
+    super.key,
+    required this.children,
+  });
 
   final List<Widget> children;
 
@@ -12,6 +15,7 @@ class AuthFormContainer extends StatelessWidget {
     return SizedBox(
       width: width,
       child: Column(
+        mainAxisSize: MainAxisSize.min,
         mainAxisAlignment: MainAxisAlignment.center,
         children: children,
       ),

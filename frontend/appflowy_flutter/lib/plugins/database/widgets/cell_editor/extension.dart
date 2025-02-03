@@ -1,11 +1,11 @@
 import 'package:appflowy/generated/flowy_svgs.g.dart';
 import 'package:appflowy/generated/locale_keys.g.dart';
 import 'package:appflowy_backend/protobuf/flowy-database2/select_option_entities.pb.dart';
-import 'package:appflowy_editor/appflowy_editor.dart';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flowy_infra/theme_extension.dart';
 import 'package:flowy_infra_ui/flowy_infra_ui.dart';
 import 'package:flutter/material.dart';
+import 'package:universal_platform/universal_platform.dart';
 
 extension SelectOptionColorExtension on SelectOptionColorPB {
   Color toColor(BuildContext context) {
@@ -33,7 +33,7 @@ extension SelectOptionColorExtension on SelectOptionColorPB {
     }
   }
 
-  String optionName() {
+  String colorName() {
     switch (this) {
       case SelectOptionColorPB.Purple:
         return LocaleKeys.grid_selectOption_purpleColor.tr();
@@ -70,6 +70,7 @@ class SelectOptionTag extends StatelessWidget {
     this.onRemove,
     this.textAlign,
     this.isExpanded = false,
+    this.borderRadius,
     required this.padding,
   }) : assert(option != null || name != null && color != null);
 
@@ -80,6 +81,7 @@ class SelectOptionTag extends StatelessWidget {
   final TextStyle? textStyle;
   final void Function(String)? onRemove;
   final EdgeInsets padding;
+  final BorderRadius? borderRadius;
   final TextAlign? textAlign;
   final bool isExpanded;
 
@@ -87,22 +89,20 @@ class SelectOptionTag extends StatelessWidget {
   Widget build(BuildContext context) {
     final optionName = option?.name ?? name!;
     final optionColor = option?.color.toColor(context) ?? color!;
-    final text = FlowyText.medium(
+    final text = FlowyText(
       optionName,
       fontSize: fontSize,
       overflow: TextOverflow.ellipsis,
       color: AFThemeExtension.of(context).textColor,
       textAlign: textAlign,
     );
+
     return Container(
       padding: onRemove == null ? padding : padding.copyWith(right: 2.0),
       decoration: BoxDecoration(
         color: optionColor,
-        borderRadius: BorderRadius.all(
-          Radius.circular(
-            PlatformExtension.isDesktopOrWeb ? 6 : 11,
-          ),
-        ),
+        borderRadius: borderRadius ??
+            BorderRadius.circular(UniversalPlatform.isDesktopOrWeb ? 6 : 11),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -119,48 +119,6 @@ class SelectOptionTag extends StatelessWidget {
           ],
         ],
       ),
-    );
-  }
-}
-
-class SelectOptionTagCell extends StatelessWidget {
-  const SelectOptionTagCell({
-    super.key,
-    required this.option,
-    required this.onSelected,
-    this.children = const [],
-  });
-
-  final SelectOptionPB option;
-  final VoidCallback onSelected;
-  final List<Widget> children;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Expanded(
-          child: GestureDetector(
-            behavior: HitTestBehavior.opaque,
-            onTap: onSelected,
-            child: Align(
-              alignment: AlignmentDirectional.centerStart,
-              child: Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 5.0,
-                  vertical: 4.0,
-                ),
-                child: SelectOptionTag(
-                  option: option,
-                  padding: const EdgeInsets.symmetric(horizontal: 8),
-                ),
-              ),
-            ),
-          ),
-        ),
-        ...children,
-      ],
     );
   }
 }

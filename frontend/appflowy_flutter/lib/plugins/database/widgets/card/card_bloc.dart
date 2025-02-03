@@ -1,13 +1,14 @@
 import 'dart:async';
 
+import 'package:appflowy/plugins/database/application/row/row_controller.dart';
+import 'package:appflowy/plugins/database/application/row/row_service.dart';
+import 'package:appflowy_backend/protobuf/flowy-database2/protobuf.dart';
 import 'package:flutter/foundation.dart';
 
 import 'package:appflowy/plugins/database/application/cell/cell_controller.dart';
 import 'package:appflowy/plugins/database/application/field/field_controller.dart';
 import 'package:appflowy/plugins/database/application/row/row_cache.dart';
-import 'package:appflowy/plugins/database/domain/row_listener.dart';
 import 'package:appflowy/plugins/database/widgets/setting/field_visibility_extension.dart';
-import 'package:appflowy_backend/protobuf/flowy-database2/row_entities.pb.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:freezed_annotation/freezed_annotation.dart';
 
@@ -18,42 +19,36 @@ class CardBloc extends Bloc<CardEvent, CardState> {
     required this.fieldController,
     required this.groupFieldId,
     required this.viewId,
-    required RowMetaPB rowMeta,
-    required RowCache rowCache,
     required bool isEditing,
-  })  : rowId = rowMeta.id,
-        _rowListener = RowListener(rowMeta.id),
-        _rowCache = rowCache,
-        super(
+    required this.rowController,
+  }) : super(
           CardState.initial(
-            rowMeta,
             _makeCells(
               fieldController,
               groupFieldId,
-              rowCache.loadCells(rowMeta),
+              rowController,
             ),
             isEditing,
+            rowController.rowMeta,
           ),
         ) {
+    rowController.initialize();
     _dispatch();
   }
 
   final FieldController fieldController;
-  final String rowId;
   final String? groupFieldId;
-  final RowCache _rowCache;
   final String viewId;
-  final RowListener _rowListener;
+  final RowController rowController;
 
   VoidCallback? _rowCallback;
 
   @override
   Future<void> close() async {
     if (_rowCallback != null) {
-      _rowCache.removeRowListener(_rowCallback!);
       _rowCallback = null;
     }
-    await _rowListener.stop();
+    await rowController.dispose();
     return super.close();
   }
 
@@ -73,7 +68,9 @@ class CardBloc extends Bloc<CardEvent, CardState> {
             );
           },
           setIsEditing: (bool isEditing) {
-            emit(state.copyWith(isEditing: isEditing));
+            if (isEditing != state.isEditing) {
+              emit(state.copyWith(isEditing: isEditing));
+            }
           },
           didUpdateRowMeta: (rowMeta) {
             emit(state.copyWith(rowMeta: rowMeta));
@@ -84,39 +81,46 @@ class CardBloc extends Bloc<CardEvent, CardState> {
   }
 
   Future<void> _startListening() async {
-    _rowCallback = _rowCache.addListener(
-      rowId: rowId,
+    rowController.addListener(
       onRowChanged: (cellMap, reason) {
         if (!isClosed) {
-          final cells = _makeCells(fieldController, groupFieldId, cellMap);
+          final cells =
+              _makeCells(fieldController, groupFieldId, rowController);
           add(CardEvent.didReceiveCells(cells, reason));
         }
       },
-    );
-
-    _rowListener.start(
-      onMetaChanged: (rowMeta) {
+      onMetaChanged: () {
         if (!isClosed) {
-          add(CardEvent.didUpdateRowMeta(rowMeta));
+          add(CardEvent.didUpdateRowMeta(rowController.rowMeta));
         }
       },
     );
   }
 }
 
-List<CellContext> _makeCells(
+List<CellMeta> _makeCells(
   FieldController fieldController,
   String? groupFieldId,
-  List<CellContext> cellContexts,
+  RowController rowController,
 ) {
   // Only show the non-hidden cells and cells that aren't of the grouping field
-  cellContexts.removeWhere((cellContext) {
+  final cellContext = rowController.loadCells();
+
+  cellContext.removeWhere((cellContext) {
     final fieldInfo = fieldController.getField(cellContext.fieldId);
     return fieldInfo == null ||
-        !(fieldInfo.fieldSettings?.visibility.isVisibleState() ?? false) ||
+        !(fieldInfo.visibility?.isVisibleState() ?? false) ||
         (groupFieldId != null && cellContext.fieldId == groupFieldId);
   });
-  return cellContexts.toList();
+  return cellContext
+      .map(
+        (cellCtx) => CellMeta(
+          fieldId: cellCtx.fieldId,
+          rowId: cellCtx.rowId,
+          fieldType: fieldController.getField(cellCtx.fieldId)!.fieldType,
+        ),
+      )
+      .toList();
 }
 
 @freezed
@@ -124,7 +128,7 @@ class CardEvent with _$CardEvent {
   const factory CardEvent.initial() = _InitialRow;
   const factory CardEvent.setIsEditing(bool isEditing) = _IsEditing;
   const factory CardEvent.didReceiveCells(
-    List<CellContext> cells,
+    List<CellMeta> cells,
     ChangedReason reason,
   ) = _DidReceiveCells;
   const factory CardEvent.didUpdateRowMeta(RowMetaPB rowMeta) =
@@ -132,22 +136,35 @@ class CardEvent with _$CardEvent {
 }
 
 @freezed
+class CellMeta with _$CellMeta {
+  const CellMeta._();
+
+  const factory CellMeta({
+    required String fieldId,
+    required RowId rowId,
+    required FieldType fieldType,
+  }) = _DatabaseCellMeta;
+
+  CellContext cellContext() => CellContext(fieldId: fieldId, rowId: rowId);
+}
+
+@freezed
 class CardState with _$CardState {
   const factory CardState({
-    required List<CellContext> cells,
-    required RowMetaPB rowMeta,
+    required List<CellMeta> cells,
     required bool isEditing,
+    required RowMetaPB rowMeta,
     ChangedReason? changeReason,
   }) = _RowCardState;
 
   factory CardState.initial(
-    RowMetaPB rowMeta,
-    List<CellContext> cells,
+    List<CellMeta> cells,
     bool isEditing,
+    RowMetaPB rowMeta,
   ) =>
       CardState(
         cells: cells,
-        rowMeta: rowMeta,
         isEditing: isEditing,
+        rowMeta: rowMeta,
       );
 }

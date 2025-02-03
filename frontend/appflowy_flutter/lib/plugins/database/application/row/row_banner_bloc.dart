@@ -1,8 +1,13 @@
-import 'package:appflowy/plugins/database/domain/field_listener.dart';
-import 'package:appflowy/plugins/database/domain/field_service.dart';
+import 'package:flutter/foundation.dart';
+
+import 'package:appflowy/plugins/database/application/field/field_controller.dart';
 import 'package:appflowy/plugins/database/application/row/row_service.dart';
+import 'package:appflowy/plugins/database/domain/field_service.dart';
+import 'package:appflowy_backend/dispatch/dispatch.dart';
 import 'package:appflowy_backend/log.dart';
 import 'package:appflowy_backend/protobuf/flowy-database2/protobuf.dart';
+import 'package:appflowy_backend/protobuf/flowy-user/user_profile.pb.dart';
+import 'package:equatable/equatable.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:freezed_annotation/freezed_annotation.dart';
 
@@ -13,6 +18,7 @@ part 'row_banner_bloc.freezed.dart';
 class RowBannerBloc extends Bloc<RowBannerEvent, RowBannerState> {
   RowBannerBloc({
     required this.viewId,
+    required this.fieldController,
     required RowMetaPB rowMeta,
   })  : _rowBackendSvc = RowBackendService(viewId: viewId),
         _metaListener = RowMetaListener(rowMeta.id),
@@ -21,16 +27,18 @@ class RowBannerBloc extends Bloc<RowBannerEvent, RowBannerState> {
   }
 
   final String viewId;
+  final FieldController fieldController;
   final RowBackendService _rowBackendSvc;
   final RowMetaListener _metaListener;
-  SingleFieldListener? _fieldListener;
+
+  UserProfilePB? _userProfile;
+  UserProfilePB? get userProfile => _userProfile;
+
+  bool get hasCover => state.rowMeta.cover.data.isNotEmpty;
 
   @override
   Future<void> close() async {
     await _metaListener.stop();
-    await _fieldListener?.stop();
-    _fieldListener = null;
-
     return super.close();
   }
 
@@ -38,15 +46,21 @@ class RowBannerBloc extends Bloc<RowBannerEvent, RowBannerState> {
     on<RowBannerEvent>(
       (event, emit) {
         event.when(
-          initial: () {
-            _loadPrimaryField();
+          initial: () async {
+            await _loadPrimaryField();
             _listenRowMetaChanged();
+            final result = await UserEventGetUserProfile().send();
+            result.fold(
+              (userProfile) => _userProfile = userProfile,
+              (error) => Log.error(error),
+            );
           },
           didReceiveRowMeta: (RowMetaPB rowMeta) {
             emit(state.copyWith(rowMeta: rowMeta));
           },
-          setCover: (String coverURL) => _updateMeta(coverURL: coverURL),
+          setCover: (RowCoverPB cover) => _updateMeta(cover: cover),
           setIcon: (String iconURL) => _updateMeta(iconURL: iconURL),
+          removeCover: () => _removeCover(),
           didReceiveFieldUpdate: (updatedField) {
             emit(
               state.copyWith(
@@ -66,11 +80,11 @@ class RowBannerBloc extends Bloc<RowBannerEvent, RowBannerState> {
     fieldOrError.fold(
       (primaryField) {
         if (!isClosed) {
-          _fieldListener = SingleFieldListener(fieldId: primaryField.id);
-          _fieldListener?.start(
+          fieldController.addSingleFieldListener(
+            primaryField.id,
             onFieldChanged: (updatedField) {
               if (!isClosed) {
-                add(RowBannerEvent.didReceiveFieldUpdate(updatedField));
+                add(RowBannerEvent.didReceiveFieldUpdate(updatedField.field));
               }
             },
           );
@@ -93,12 +107,17 @@ class RowBannerBloc extends Bloc<RowBannerEvent, RowBannerState> {
   }
 
   /// Update the meta of the row and the view
-  Future<void> _updateMeta({String? iconURL, String? coverURL}) async {
+  Future<void> _updateMeta({String? iconURL, RowCoverPB? cover}) async {
     final result = await _rowBackendSvc.updateMeta(
       iconURL: iconURL,
-      coverURL: coverURL,
+      cover: cover,
       rowId: state.rowMeta.id,
     );
+    result.fold((l) => null, (err) => Log.error(err));
+  }
+
+  Future<void> _removeCover() async {
+    final result = await _rowBackendSvc.removeCover(state.rowMeta.id);
     result.fold((l) => null, (err) => Log.error(err));
   }
 }
@@ -111,11 +130,14 @@ class RowBannerEvent with _$RowBannerEvent {
   const factory RowBannerEvent.didReceiveFieldUpdate(FieldPB field) =
       _DidReceiveFieldUpdate;
   const factory RowBannerEvent.setIcon(String iconURL) = _SetIcon;
-  const factory RowBannerEvent.setCover(String coverURL) = _SetCover;
+  const factory RowBannerEvent.setCover(RowCoverPB cover) = _SetCover;
+  const factory RowBannerEvent.removeCover() = _RemoveCover;
 }
 
 @freezed
-class RowBannerState with _$RowBannerState {
+class RowBannerState extends Equatable with _$RowBannerState {
+  const RowBannerState._();
+
   const factory RowBannerState({
     required FieldPB? primaryField,
     required RowMetaPB rowMeta,
@@ -127,6 +149,14 @@ class RowBannerState with _$RowBannerState {
         rowMeta: rowMetaPB,
         loadingState: const LoadingState.loading(),
       );
+
+  @override
+  List<Object?> get props => [
+        rowMeta.cover.data,
+        rowMeta.icon,
+        primaryField,
+        loadingState,
+      ];
 }
 
 @freezed

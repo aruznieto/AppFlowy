@@ -13,8 +13,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:provider/provider.dart';
 import 'package:styled_widget/styled_widget.dart';
-
-typedef NaviAction = void Function();
+import 'package:universal_platform/universal_platform.dart';
 
 class NavigationNotifier with ChangeNotifier {
   NavigationNotifier({required this.navigationItems});
@@ -64,33 +63,44 @@ class FlowyNavigation extends StatelessWidget {
     return BlocBuilder<HomeSettingBloc, HomeSettingState>(
       buildWhen: (p, c) => p.isMenuCollapsed != c.isMenuCollapsed,
       builder: (context, state) {
-        if (state.isMenuCollapsed) {
-          return RotationTransition(
-            turns: const AlwaysStoppedAnimation(180 / 360),
-            child: FlowyTooltip(
-              richMessage: sidebarTooltipTextSpan(
-                context,
-                LocaleKeys.sideBar_openSidebar.tr(),
+        if (!UniversalPlatform.isWindows && state.isMenuCollapsed) {
+          final textSpan = TextSpan(
+            children: [
+              TextSpan(
+                text: '${LocaleKeys.sideBar_openSidebar.tr()}\n',
+                style: context.tooltipTextStyle(),
               ),
-              child: FlowyIconButton(
-                width: 24,
-                hoverColor: Colors.transparent,
-                onPressed: () {
-                  context
+              TextSpan(
+                text: Platform.isMacOS ? '⌘+.' : 'Ctrl+\\',
+                style: context
+                    .tooltipTextStyle()
+                    ?.copyWith(color: Theme.of(context).hintColor),
+              ),
+            ],
+          );
+          return Padding(
+            padding: const EdgeInsets.only(right: 8.0),
+            child: RotationTransition(
+              turns: const AlwaysStoppedAnimation(180 / 360),
+              child: FlowyTooltip(
+                richMessage: textSpan,
+                child: Listener(
+                  onPointerDown: (event) => context
                       .read<HomeSettingBloc>()
-                      .add(const HomeSettingEvent.collapseMenu());
-                },
-                iconPadding: const EdgeInsets.fromLTRB(2, 2, 2, 2),
-                icon: FlowySvg(
-                  FlowySvgs.hide_menu_m,
-                  color: Theme.of(context).iconTheme.color,
+                      .add(const HomeSettingEvent.collapseMenu()),
+                  child: FlowyIconButton(
+                    width: 24,
+                    onPressed: () {},
+                    iconPadding: const EdgeInsets.all(4),
+                    icon: const FlowySvg(FlowySvgs.hide_menu_s),
+                  ),
                 ),
               ),
             ),
           );
-        } else {
-          return const SizedBox.shrink();
         }
+
+        return const SizedBox.shrink();
       },
     );
   }
@@ -146,32 +156,19 @@ class NaviItemWidget extends StatelessWidget {
   }
 }
 
-class NaviItemDivider extends StatelessWidget {
-  const NaviItemDivider({super.key, required this.child});
-
-  final Widget child;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [child, const Text('/')],
-    );
-  }
-}
-
 class EllipsisNaviItem extends NavigationItem {
   EllipsisNaviItem({required this.items});
 
   final List<NavigationItem> items;
 
   @override
-  Widget get leftBarItem => FlowyText.medium(
-        '...',
-        fontSize: FontSizes.s16,
-      );
+  String? get viewName => null;
 
   @override
-  Widget tabBarItem(String pluginId) => leftBarItem;
+  Widget get leftBarItem => FlowyText.medium('...', fontSize: FontSizes.s16);
+
+  @override
+  Widget tabBarItem(String pluginId, [bool shortForm = false]) => leftBarItem;
 
   @override
   NavigationCallback get action => (id) {};

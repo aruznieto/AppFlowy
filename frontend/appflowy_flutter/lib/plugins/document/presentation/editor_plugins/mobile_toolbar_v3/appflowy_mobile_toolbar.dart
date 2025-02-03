@@ -1,21 +1,26 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:math';
 
-import 'package:appflowy/plugins/document/presentation/editor_plugins/mobile_toolbar_v3/_close_keyboard_or_menu_button.dart';
-import 'package:appflowy/plugins/document/presentation/editor_plugins/mobile_toolbar_v3/_toolbar_theme.dart';
+import 'package:appflowy/plugins/document/application/document_bloc.dart';
+import 'package:appflowy/plugins/document/presentation/editor_plugins/mobile_toolbar_v3/aa_menu/_close_keyboard_or_menu_button.dart';
+import 'package:appflowy/plugins/document/presentation/editor_plugins/mobile_toolbar_v3/aa_menu/_toolbar_theme.dart';
 import 'package:appflowy/plugins/document/presentation/editor_plugins/mobile_toolbar_v3/appflowy_mobile_toolbar_item.dart';
 import 'package:appflowy/plugins/document/presentation/editor_plugins/mobile_toolbar_v3/keyboard_height_observer.dart';
 import 'package:appflowy_editor/appflowy_editor.dart';
 import 'package:collection/collection.dart';
 import 'package:flowy_infra_ui/flowy_infra_ui.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import 'package:scrollable_positioned_list/scrollable_positioned_list.dart';
 
 abstract class AppFlowyMobileToolbarWidgetService {
   void closeItemMenu();
+
   void closeKeyboard();
 
   PropertyValueNotifier<bool> get showMenuNotifier;
@@ -26,13 +31,15 @@ class AppFlowyMobileToolbar extends StatefulWidget {
     super.key,
     this.toolbarHeight = 50.0,
     required this.editorState,
-    required this.toolbarItems,
+    required this.toolbarItemsBuilder,
     required this.child,
   });
 
   final EditorState editorState;
   final double toolbarHeight;
-  final List<AppFlowyMobileToolbarItem> toolbarItems;
+  final List<AppFlowyMobileToolbarItem> Function(
+    Selection? selection,
+  ) toolbarItemsBuilder;
   final Widget child;
 
   @override
@@ -64,16 +71,16 @@ class _AppFlowyMobileToolbarState extends State<AppFlowyMobileToolbar> {
   Widget build(BuildContext context) {
     return Column(
       children: [
-        Expanded(
-          child: widget.child,
-        ),
+        Expanded(child: widget.child),
         // add a bottom offset to make sure the toolbar is above the keyboard
         ValueListenableBuilder(
           valueListenable: isKeyboardShow,
           builder: (context, isKeyboardShow, __) {
-            return AnimatedContainer(
-              duration: const Duration(milliseconds: 110),
-              height: isKeyboardShow ? widget.toolbarHeight : 0,
+            return SizedBox(
+              // only adding padding when the keyboard is triggered by editor
+              height: isKeyboardShow && widget.editorState.selection != null
+                  ? widget.toolbarHeight
+                  : 0,
             );
           },
         ),
@@ -106,10 +113,13 @@ class _AppFlowyMobileToolbarState extends State<AppFlowyMobileToolbar> {
         }
 
         return RepaintBoundary(
-          child: _MobileToolbar(
-            editorState: widget.editorState,
-            toolbarItems: widget.toolbarItems,
-            toolbarHeight: widget.toolbarHeight,
+          child: BlocProvider.value(
+            value: context.read<DocumentBloc>(),
+            child: _MobileToolbar(
+              editorState: widget.editorState,
+              toolbarItems: widget.toolbarItemsBuilder(selection),
+              toolbarHeight: widget.toolbarHeight,
+            ),
           ),
         );
       },
@@ -170,7 +180,13 @@ class _MobileToolbarState extends State<_MobileToolbar>
   //  but in this case, we don't want to update the cached keyboard height.
   // This is because we want to keep the same height when the menu is shown.
   bool canUpdateCachedKeyboardHeight = true;
-  ValueNotifier<double> cachedKeyboardHeight = ValueNotifier(0.0);
+
+  /// when the [_MobileToolbar] disposed before the keyboard height can be updated in time,
+  /// there will be an issue with the height being 0
+  /// this is used to globally record the height.
+  static double _globalCachedKeyboardHeight = 0.0;
+  ValueNotifier<double> cachedKeyboardHeight =
+      ValueNotifier(_globalCachedKeyboardHeight);
 
   // used to check if click the same item again
   int? selectedMenuIndex;
@@ -234,14 +250,14 @@ class _MobileToolbarState extends State<_MobileToolbar>
     //  - otherwise, add a spacer to push the toolbar up when the keyboard is shown
     return Column(
       children: [
-        Divider(
+        const Divider(
           height: 0.5,
-          color: Colors.grey.withOpacity(0.5),
+          color: Color(0x7FEDEDED),
         ),
         _buildToolbar(context),
-        Divider(
+        const Divider(
           height: 0.5,
-          color: Colors.grey.withOpacity(0.5),
+          color: Color(0x7FEDEDED),
         ),
         _buildMenuOrSpacer(context),
       ],
@@ -267,7 +283,9 @@ class _MobileToolbarState extends State<_MobileToolbar>
     if (!closeKeyboardInitiative &&
         cachedKeyboardHeight.value != 0 &&
         height == 0) {
-      widget.editorState.selection = null;
+      if (!widget.editorState.isDisposed) {
+        widget.editorState.selection = null;
+      }
     }
 
     // if the menu is shown and the height is not 0, we need to close the menu
@@ -277,6 +295,14 @@ class _MobileToolbarState extends State<_MobileToolbar>
 
     if (canUpdateCachedKeyboardHeight) {
       cachedKeyboardHeight.value = height;
+
+      if (defaultTargetPlatform == TargetPlatform.android) {
+        // cache the keyboard height with the view padding in Android
+        if (cachedKeyboardHeight.value != 0) {
+          cachedKeyboardHeight.value +=
+              MediaQuery.of(context).viewPadding.bottom;
+        }
+      }
     }
 
     if (height == 0) {
@@ -342,62 +368,29 @@ class _MobileToolbarState extends State<_MobileToolbar>
               },
             ),
           ),
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 13.0),
+            child: VerticalDivider(
+              width: 1.0,
+              thickness: 1.0,
+              color: Color(0xFFD9D9D9),
+            ),
+          ),
           // close menu or close keyboard button
-          ClipRect(
-            clipper: const _MyClipper(
-              offset: -20,
-            ),
-            child: ValueListenableBuilder(
-              valueListenable: showMenuNotifier,
-              builder: (_, showingMenu, __) {
-                return ValueListenableBuilder(
-                  valueListenable: toolbarOffset,
-                  builder: (_, offset, __) {
-                    final showShadow = offset > 0;
-                    return DecoratedBox(
-                      decoration: BoxDecoration(
-                        color: theme.toolbarBackgroundColor,
-                        boxShadow: showShadow
-                            ? [
-                                BoxShadow(
-                                  color: theme.toolbarShadowColor,
-                                  blurRadius: 20,
-                                  offset: const Offset(-2, 0),
-                                  spreadRadius: -10,
-                                ),
-                              ]
-                            : null,
-                      ),
-                      child: CloseKeyboardOrMenuButton(
-                        showingMenu: showingMenu,
-                        onPressed: () {
-                          if (showingMenu) {
-                            // close the menu and show the keyboard
-                            closeItemMenu();
-                            _showKeyboard();
-                          } else {
-                            closeKeyboardInitiative = true;
-                            // close the keyboard and clear the selection
-                            // if the selection is null, the keyboard and the toolbar will be hidden automatically
-                            widget.editorState.selection = null;
+          CloseKeyboardOrMenuButton(
+            onPressed: () {
+              closeKeyboardInitiative = true;
+              // close the keyboard and clear the selection
+              // if the selection is null, the keyboard and the toolbar will be hidden automatically
+              widget.editorState.selection = null;
 
-                            // sometimes, the keyboard is not closed after the selection is cleared
-                            if (Platform.isAndroid) {
-                              SystemChannels.textInput
-                                  .invokeMethod('TextInput.hide');
-                            }
-                          }
-                        },
-                      ),
-                    );
-                  },
-                );
-              },
-            ),
+              // sometimes, the keyboard is not closed after the selection is cleared
+              if (Platform.isAndroid) {
+                SystemChannels.textInput.invokeMethod('TextInput.hide');
+              }
+            },
           ),
-          const SizedBox(
-            width: 4.0,
-          ),
+          const HSpace(4.0),
         ],
       ),
     );
@@ -408,26 +401,35 @@ class _MobileToolbarState extends State<_MobileToolbar>
     return ValueListenableBuilder(
       valueListenable: cachedKeyboardHeight,
       builder: (_, height, ___) {
-        return AnimatedContainer(
-          duration: const Duration(microseconds: 110),
-          height: height,
-          child: ValueListenableBuilder(
-            valueListenable: showMenuNotifier,
-            builder: (_, showingMenu, __) {
-              return AnimatedContainer(
-                duration: const Duration(microseconds: 110),
-                height: height,
-                child: (showingMenu && selectedMenuIndex != null)
-                    ? widget.toolbarItems[selectedMenuIndex!].menuBuilder?.call(
-                          context,
-                          widget.editorState,
-                          this,
-                        ) ??
-                        const SizedBox.shrink()
-                    : const SizedBox.shrink(),
-              );
-            },
-          ),
+        return ValueListenableBuilder(
+          valueListenable: showMenuNotifier,
+          builder: (_, showingMenu, __) {
+            var keyboardHeight = height;
+            if (defaultTargetPlatform == TargetPlatform.android) {
+              if (!showingMenu) {
+                // take the max value of the keyboard height and the view padding
+                // to make sure the toolbar is above the keyboard
+                keyboardHeight = max(
+                  keyboardHeight,
+                  MediaQuery.of(context).viewInsets.bottom,
+                );
+              }
+            }
+            if (keyboardHeight > 0) {
+              _globalCachedKeyboardHeight = keyboardHeight;
+            }
+            return SizedBox(
+              height: keyboardHeight,
+              child: (showingMenu && selectedMenuIndex != null)
+                  ? widget.toolbarItems[selectedMenuIndex!].menuBuilder?.call(
+                        context,
+                        widget.editorState,
+                        this,
+                      ) ??
+                      const SizedBox.shrink()
+                  : const SizedBox.shrink(),
+            );
+          },
         );
       },
     );
@@ -488,8 +490,13 @@ class _ToolbarItemListViewState extends State<_ToolbarItemListView> {
 
   @override
   Widget build(BuildContext context) {
+    const left = 8.0;
+    const right = 4.0;
+    // 68.0 is the width of the close keyboard/menu button
+    final padding = _calculatePadding(left + right + 68.0);
+
     final children = [
-      const HSpace(16),
+      const HSpace(left),
       ...widget.toolbarItems
           .mapIndexed(
             (index, element) => element.itemBuilder.call(
@@ -508,9 +515,9 @@ class _ToolbarItemListViewState extends State<_ToolbarItemListView> {
                   : null,
             ),
           )
-          .map((e) => [e, const HSpace(10)])
+          .map((e) => [e, HSpace(padding)])
           .flattened,
-      const HSpace(4),
+      const HSpace(right),
     ];
 
     return PageStorage(
@@ -524,6 +531,23 @@ class _ToolbarItemListViewState extends State<_ToolbarItemListView> {
         itemCount: children.length,
       ),
     );
+  }
+
+  double _calculatePadding(double extent) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final width = screenWidth - extent;
+    final int count;
+    if (screenWidth <= 340) {
+      count = 5;
+    } else if (screenWidth <= 384) {
+      count = 6;
+    } else if (screenWidth <= 430) {
+      count = 7;
+    } else {
+      count = 8;
+    }
+    // left + item count * width + item count * padding + right + close button width = screenWidth
+    return (width - count * 40.0) / count;
   }
 
   void _debounceUpdatePilotPosition() {
@@ -565,18 +589,4 @@ class _ToolbarItemListViewState extends State<_ToolbarItemListView> {
 
     previousSelection = selection;
   }
-}
-
-class _MyClipper extends CustomClipper<Rect> {
-  const _MyClipper({
-    this.offset = 0,
-  });
-
-  final double offset;
-
-  @override
-  Rect getClip(Size size) => Rect.fromLTWH(offset, 0, 64.0, 46.0);
-
-  @override
-  bool shouldReclip(CustomClipper<Rect> oldClipper) => false;
 }

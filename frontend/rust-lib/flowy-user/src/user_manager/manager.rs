@@ -1,66 +1,70 @@
 use collab_integrate::collab_builder::AppFlowyCollabBuilder;
 use collab_integrate::CollabKVDB;
-use collab_user::core::MutexUserAwareness;
 use flowy_error::{internal_error, ErrorCode, FlowyResult};
-use flowy_folder_pub::entities::ImportData;
+
+use arc_swap::ArcSwapOption;
+use collab::lock::RwLock;
+use collab_user::core::UserAwareness;
+use dashmap::DashMap;
 use flowy_server_pub::AuthenticatorType;
-use flowy_sqlite::kv::StorePreferences;
+use flowy_sqlite::kv::KVStorePreferences;
 use flowy_sqlite::schema::user_table;
 use flowy_sqlite::ConnectionPool;
 use flowy_sqlite::{query_dsl::*, DBConnection, ExpressionMethods};
 use flowy_user_pub::cloud::{UserCloudServiceProvider, UserUpdate};
 use flowy_user_pub::entities::*;
 use flowy_user_pub::workspace_service::UserWorkspaceService;
+use semver::Version;
 use serde_json::Value;
 use std::string::ToString;
 use std::sync::atomic::{AtomicI64, Ordering};
 use std::sync::{Arc, Weak};
-use tokio::sync::{Mutex, RwLock};
+use tokio::sync::Mutex;
 use tokio_stream::StreamExt;
 use tracing::{debug, error, event, info, instrument, warn};
 
-use lib_dispatch::prelude::af_spawn;
 use lib_infra::box_any::BoxAny;
 
-use crate::anon_user::{migration_anon_user_on_sign_up, sync_supabase_user_data_to_cloud};
 use crate::entities::{AuthStateChangedPB, AuthStatePB, UserProfilePB, UserSettingPB};
 use crate::event_map::{DefaultUserStatusCallback, UserStatusCallback};
 use crate::migrations::document_empty_content::HistoricalEmptyDocumentMigration;
-use crate::migrations::migration::{UserDataMigration, UserLocalDataMigration};
+use crate::migrations::migration::{
+  save_migration_record, UserDataMigration, UserLocalDataMigration, FIRST_TIME_INSTALL_VERSION,
+};
 use crate::migrations::workspace_and_favorite_v1::FavoriteV1AndWorkspaceArrayMigration;
 use crate::migrations::workspace_trash_v1::WorkspaceTrashMapToSectionMigration;
 use crate::migrations::AnonUser;
 use crate::services::authenticate_user::AuthenticateUser;
 use crate::services::cloud_config::get_cloud_config;
-use crate::services::collab_interact::{CollabInteract, DefaultCollabInteract};
-use crate::services::data_import::importer::import_data;
-use crate::services::data_import::ImportContext;
+use crate::services::collab_interact::{DefaultCollabInteract, UserReminder};
 
+use super::manager_user_workspace::save_user_workspace;
+use crate::migrations::doc_key_with_workspace::CollabDocKeyWithWorkspaceIdMigration;
 use crate::services::sqlite_sql::user_sql::{select_user_profile, UserTable, UserTableChangeset};
-use crate::user_manager::manager_user_awareness::UserAwarenessDataSource;
 use crate::user_manager::manager_user_encryption::validate_encryption_sign;
-use crate::user_manager::manager_user_workspace::save_user_workspaces;
+use crate::user_manager::manager_user_workspace::save_all_user_workspaces;
 use crate::user_manager::user_login_state::UserAuthProcess;
 use crate::{errors::FlowyError, notification::*};
 use flowy_user_pub::session::Session;
 
 pub struct UserManager {
   pub(crate) cloud_services: Arc<dyn UserCloudServiceProvider>,
-  pub(crate) store_preferences: Arc<StorePreferences>,
-  pub(crate) user_awareness: Arc<Mutex<Option<MutexUserAwareness>>>,
+  pub(crate) store_preferences: Arc<KVStorePreferences>,
+  pub(crate) user_awareness: Arc<ArcSwapOption<RwLock<UserAwareness>>>,
   pub(crate) user_status_callback: RwLock<Arc<dyn UserStatusCallback>>,
   pub(crate) collab_builder: Weak<AppFlowyCollabBuilder>,
-  pub(crate) collab_interact: RwLock<Arc<dyn CollabInteract>>,
+  pub(crate) collab_interact: RwLock<Arc<dyn UserReminder>>,
   pub(crate) user_workspace_service: Arc<dyn UserWorkspaceService>,
   auth_process: Mutex<Option<UserAuthProcess>>,
   pub(crate) authenticate_user: Arc<AuthenticateUser>,
   refresh_user_profile_since: AtomicI64,
+  pub(crate) is_loading_awareness: Arc<DashMap<String, bool>>,
 }
 
 impl UserManager {
   pub fn new(
     cloud_services: Arc<dyn UserCloudServiceProvider>,
-    store_preferences: Arc<StorePreferences>,
+    store_preferences: Arc<KVStorePreferences>,
     collab_builder: Weak<AppFlowyCollabBuilder>,
     authenticate_user: Arc<AuthenticateUser>,
     user_workspace_service: Arc<dyn UserWorkspaceService>,
@@ -72,7 +76,7 @@ impl UserManager {
     let user_manager = Arc::new(Self {
       cloud_services,
       store_preferences,
-      user_awareness: Arc::new(Default::default()),
+      user_awareness: Default::default(),
       user_status_callback,
       collab_builder,
       collab_interact: RwLock::new(Arc::new(DefaultCollabInteract)),
@@ -80,12 +84,13 @@ impl UserManager {
       authenticate_user,
       refresh_user_profile_since,
       user_workspace_service,
+      is_loading_awareness: Arc::new(Default::default()),
     });
 
     let weak_user_manager = Arc::downgrade(&user_manager);
     if let Ok(user_service) = user_manager.cloud_services.get_user_service() {
       if let Some(mut rx) = user_service.subscribe_user_update() {
-        af_spawn(async move {
+        tokio::spawn(async move {
           while let Some(update) = rx.recv().await {
             if let Some(user_manager) = weak_user_manager.upgrade() {
               if let Err(err) = user_manager.handler_user_update(update).await {
@@ -106,7 +111,7 @@ impl UserManager {
     }
   }
 
-  pub fn get_store_preferences(&self) -> Weak<StorePreferences> {
+  pub fn get_store_preferences(&self) -> Weak<KVStorePreferences> {
     Arc::downgrade(&self.store_preferences)
   }
 
@@ -118,7 +123,7 @@ impl UserManager {
   /// the function will set up the collaboration configuration and initialize the user's awareness. Upon successful
   /// completion, a user status callback is invoked to signify that the initialization process is complete.
   #[instrument(level = "debug", skip_all, err)]
-  pub async fn init_with_callback<C: UserStatusCallback + 'static, I: CollabInteract>(
+  pub async fn init_with_callback<C: UserStatusCallback + 'static, I: UserReminder>(
     &self,
     user_status_callback: C,
     collab_interact: I,
@@ -129,6 +134,7 @@ impl UserManager {
 
     if let Ok(session) = self.get_session() {
       let user = self.get_user_profile_from_disk(session.user_id).await?;
+
       // Get the current authenticator from the environment variable
       let current_authenticator = current_authenticator();
 
@@ -147,9 +153,10 @@ impl UserManager {
 
       event!(
         tracing::Level::INFO,
-        "init user session: {}:{}",
+        "init user session: {}:{}, authenticator: {:?}",
         user.uid,
-        user.email
+        user.email,
+        user.authenticator,
       );
 
       self.prepare_user(&session).await;
@@ -163,6 +170,10 @@ impl UserManager {
           error!("Set token failed: {}", err);
         }
 
+        if let Err(err) = self.cloud_services.set_ai_model(&user.ai_model) {
+          error!("Set ai model failed: {}", err);
+        }
+
         // Subscribe the token state
         let weak_cloud_services = Arc::downgrade(&self.cloud_services);
         let weak_authenticate_user = Arc::downgrade(&self.authenticate_user);
@@ -172,7 +183,7 @@ impl UserManager {
           event!(tracing::Level::DEBUG, "Listen token state change");
           let user_uid = user.uid;
           let local_token = user.token.clone();
-          af_spawn(async move {
+          tokio::spawn(async move {
             while let Some(token_state) = token_state_rx.next().await {
               debug!("Token state changed: {:?}", token_state);
               match token_state {
@@ -235,7 +246,7 @@ impl UserManager {
         }
       }
 
-      // Do the user data migration if needed
+      // Do the user data migration if needed.
       event!(tracing::Level::INFO, "Prepare user data migration");
       match (
         self
@@ -245,15 +256,25 @@ impl UserManager {
         self.authenticate_user.database.get_pool(session.user_id),
       ) {
         (Ok(collab_db), Ok(sqlite_pool)) => {
-          run_collab_data_migration(&session, &user, collab_db, sqlite_pool);
+          run_collab_data_migration(
+            &session,
+            &user,
+            collab_db,
+            sqlite_pool,
+            self.store_preferences.clone(),
+            &self.authenticate_user.user_config.app_version,
+          );
         },
         _ => error!("Failed to get collab db or sqlite pool"),
       }
       self.authenticate_user.vacuum_database_if_need();
+
+      // migrations should run before set the first time installed version
+      self.set_first_time_installed_version();
       let cloud_config = get_cloud_config(session.user_id, &self.store_preferences);
-      // Init the user awareness
-      self
-        .initialize_user_awareness(&session, UserAwarenessDataSource::Local)
+      // Init the user awareness. here we ignore the error
+      let _ = self
+        .initial_user_awareness(&session, &user.authenticator)
         .await;
 
       user_status_callback
@@ -263,13 +284,35 @@ impl UserManager {
           &cloud_config,
           &session.user_workspace,
           &self.authenticate_user.user_config.device_id,
+          &user.authenticator,
         )
         .await?;
+    } else {
+      self.set_first_time_installed_version();
     }
     Ok(())
   }
 
-  pub fn get_session(&self) -> FlowyResult<Session> {
+  fn set_first_time_installed_version(&self) {
+    if self
+      .store_preferences
+      .get_str(FIRST_TIME_INSTALL_VERSION)
+      .is_none()
+    {
+      info!(
+        "Set install version: {:?}",
+        self.authenticate_user.user_config.app_version
+      );
+      if let Err(err) = self.store_preferences.set_object(
+        FIRST_TIME_INSTALL_VERSION,
+        &self.authenticate_user.user_config.app_version,
+      ) {
+        error!("Set install version error: {:?}", err);
+      }
+    }
+  }
+
+  pub fn get_session(&self) -> FlowyResult<Arc<Session>> {
     self.authenticate_user.get_session()
   }
 
@@ -325,9 +368,8 @@ impl UserManager {
       .await?;
 
     let _ = self
-      .initialize_user_awareness(&session, UserAwarenessDataSource::Remote)
+      .initial_user_awareness(&session, &user_profile.authenticator)
       .await;
-
     self
       .user_status_callback
       .read()
@@ -336,6 +378,7 @@ impl UserManager {
         user_profile.uid,
         &latest_workspace,
         &self.authenticate_user.user_config.device_id,
+        &authenticator,
       )
       .await?;
     send_auth_state_notification(AuthStateChangedPB {
@@ -412,15 +455,12 @@ impl UserManager {
   ) -> FlowyResult<()> {
     let new_session = Session::from(&response);
     self.prepare_user(&new_session).await;
-
-    let user_awareness_source = if response.is_new_user {
-      UserAwarenessDataSource::Local
-    } else {
-      UserAwarenessDataSource::Remote
-    };
     self
       .save_auth_data(&response, authenticator, &new_session)
       .await?;
+    let _ = self
+      .initial_user_awareness(&new_session, &new_user_profile.authenticator)
+      .await;
     self
       .user_status_callback
       .read()
@@ -430,14 +470,22 @@ impl UserManager {
         new_user_profile,
         &new_session.user_workspace,
         &self.authenticate_user.user_config.device_id,
+        authenticator,
       )
       .await?;
 
-    self
-      .initialize_user_awareness(&new_session, user_awareness_source)
-      .await;
-
     if response.is_new_user {
+      // For new user, we don't need to run the migrations
+      if let Ok(pool) = self
+        .authenticate_user
+        .database
+        .get_pool(new_session.user_id)
+      {
+        mark_all_migrations_as_applied(&pool);
+      } else {
+        error!("Failed to get pool for user {}", new_session.user_id);
+      }
+
       if let Some(old_user) = migration_user {
         event!(
           tracing::Level::INFO,
@@ -477,6 +525,16 @@ impl UserManager {
     Ok(())
   }
 
+  #[tracing::instrument(level = "info", skip(self))]
+  pub async fn delete_account(&self) -> Result<(), FlowyError> {
+    self
+      .cloud_services
+      .get_user_service()?
+      .delete_account()
+      .await?;
+    Ok(())
+  }
+
   /// Updates the user's profile with the given parameters.
   ///
   /// This function modifies the user's profile based on the provided update parameters. After updating, it
@@ -509,7 +567,6 @@ impl UserManager {
 
   pub async fn prepare_user(&self, session: &Session) {
     let _ = self.authenticate_user.database.close(session.user_id);
-    self.prepare_collab(session);
   }
 
   pub async fn prepare_backup(&self, session: &Session) {
@@ -521,7 +578,7 @@ impl UserManager {
     self
       .authenticate_user
       .database
-      .backup_or_restore(session.user_id, &session.user_workspace.id);
+      .backup(session.user_id, &session.user_workspace.id);
   }
 
   /// Fetches the user profile for the given user ID.
@@ -605,7 +662,8 @@ impl UserManager {
   }
 
   pub fn workspace_id(&self) -> Result<String, FlowyError> {
-    Ok(self.get_session()?.user_workspace.id)
+    let session = self.get_session()?;
+    Ok(session.user_workspace.id.clone())
   }
 
   pub fn token(&self) -> Result<Option<String>, FlowyError> {
@@ -619,7 +677,7 @@ impl UserManager {
     params: UpdateUserProfileParams,
   ) -> Result<(), FlowyError> {
     let server = self.cloud_services.get_user_service()?;
-    af_spawn(async move {
+    tokio::spawn(async move {
       let credentials = UserCredentials::new(Some(token), Some(uid), None);
       server.update_user(credentials, params).await
     })
@@ -658,11 +716,23 @@ impl UserManager {
     self.cloud_services.set_user_authenticator(authenticator);
 
     let auth_service = self.cloud_services.get_user_service()?;
-    let url = auth_service
-      .generate_sign_in_url_with_email(email)
-      .await
-      .map_err(|err| FlowyError::server_error().with_context(err))?;
+    let url = auth_service.generate_sign_in_url_with_email(email).await?;
     Ok(url)
+  }
+
+  pub(crate) async fn sign_in_with_magic_link(
+    &self,
+    email: &str,
+    redirect_to: &str,
+  ) -> Result<(), FlowyError> {
+    self
+      .cloud_services
+      .set_user_authenticator(&Authenticator::AppFlowyCloud);
+    let auth_service = self.cloud_services.get_user_service()?;
+    auth_service
+      .sign_in_with_magic_link(email, redirect_to)
+      .await?;
+    Ok(())
   }
 
   pub(crate) async fn generate_oauth_url(
@@ -690,21 +760,22 @@ impl UserManager {
     let uid = user_profile.uid;
     if authenticator.is_local() {
       event!(tracing::Level::DEBUG, "Save new anon user: {:?}", uid);
-      self.set_anon_user(session.clone());
+      self.set_anon_user(session);
     }
 
-    save_user_workspaces(uid, self.db_connection(uid)?, response.user_workspaces())?;
-    event!(tracing::Level::INFO, "Save new user profile to disk");
-    self.authenticate_user.set_session(Some(session.clone()))?;
+    save_all_user_workspaces(uid, self.db_connection(uid)?, response.user_workspaces())?;
+    info!(
+      "Save new user profile to disk, authenticator: {:?}",
+      authenticator
+    );
+
+    self
+      .authenticate_user
+      .set_session(Some(session.clone().into()))?;
     self
       .save_user(uid, (user_profile, authenticator.clone()).into())
       .await?;
     Ok(())
-  }
-
-  fn prepare_collab(&self, session: &Session) {
-    let collab_builder = self.collab_builder.upgrade().unwrap();
-    collab_builder.initialize(session.user_workspace.id.clone());
   }
 
   async fn handler_user_update(&self, user_update: UserUpdate) -> FlowyResult<()> {
@@ -730,80 +801,41 @@ impl UserManager {
   async fn migrate_anon_user_data_to_cloud(
     &self,
     old_user: &AnonUser,
-    new_user_session: &Session,
+    _new_user_session: &Session,
     authenticator: &Authenticator,
   ) -> Result<(), FlowyError> {
     let old_collab_db = self
       .authenticate_user
       .database
       .get_collab_db(old_user.session.user_id)?;
-    let new_collab_db = self
-      .authenticate_user
-      .database
-      .get_collab_db(new_user_session.user_id)?;
 
-    match authenticator {
-      Authenticator::Supabase => {
-        migration_anon_user_on_sign_up(old_user, &old_collab_db, new_user_session, &new_collab_db)?;
-        if let Err(err) = sync_supabase_user_data_to_cloud(
-          self.cloud_services.get_user_service()?,
-          &self.authenticate_user.user_config.device_id,
-          new_user_session,
-          &new_collab_db,
-        )
-        .await
-        {
-          error!("Sync user data to cloud failed: {:?}", err);
-        }
-      },
-      Authenticator::AppFlowyCloud => {
-        self
-          .migration_anon_user_on_appflowy_cloud_sign_up(old_user, &old_collab_db)
-          .await?;
-      },
-      _ => {},
+    if authenticator == &Authenticator::AppFlowyCloud {
+      self
+        .migration_anon_user_on_appflowy_cloud_sign_up(old_user, &old_collab_db)
+        .await?;
     }
 
     // Save the old user workspace setting.
-    save_user_workspaces(
+    save_user_workspace(
       old_user.session.user_id,
       self
         .authenticate_user
         .database
         .get_connection(old_user.session.user_id)?,
-      &[old_user.session.user_workspace.clone()],
+      &old_user.session.user_workspace.clone(),
     )?;
     Ok(())
-  }
-
-  pub(crate) async fn import_appflowy_data(
-    &self,
-    context: ImportContext,
-  ) -> Result<ImportData, FlowyError> {
-    let session = self.get_session()?;
-    let user_collab_db = self
-      .authenticate_user
-      .database
-      .get_collab_db(session.user_id)?;
-    let import_data = tokio::task::spawn_blocking(move || {
-      import_data(&session, context, user_collab_db)
-        .map_err(|err| FlowyError::new(ErrorCode::AppFlowyDataFolderImportError, err.to_string()))
-    })
-    .await
-    .map_err(internal_error)??;
-    Ok(import_data)
   }
 }
 
 fn current_authenticator() -> Authenticator {
   match AuthenticatorType::from_env() {
     AuthenticatorType::Local => Authenticator::Local,
-    AuthenticatorType::Supabase => Authenticator::Supabase,
     AuthenticatorType::AppFlowyCloud => Authenticator::AppFlowyCloud,
   }
 }
 
-fn upsert_user_profile_change(
+pub fn upsert_user_profile_change(
   uid: i64,
   mut conn: DBConnection,
   changeset: UserTableChangeset,
@@ -839,28 +871,49 @@ fn remove_user_token(uid: i64, mut conn: DBConnection) -> FlowyResult<()> {
   Ok(())
 }
 
+fn collab_migration_list() -> Vec<Box<dyn UserDataMigration>> {
+  // ⚠️The order of migrations is crucial. If you're adding a new migration, please ensure
+  // it's appended to the end of the list.
+  vec![
+    Box::new(HistoricalEmptyDocumentMigration),
+    Box::new(FavoriteV1AndWorkspaceArrayMigration),
+    Box::new(WorkspaceTrashMapToSectionMigration),
+    Box::new(CollabDocKeyWithWorkspaceIdMigration),
+  ]
+}
+
+fn mark_all_migrations_as_applied(sqlite_pool: &Arc<ConnectionPool>) {
+  if let Ok(mut conn) = sqlite_pool.get() {
+    for migration in collab_migration_list() {
+      save_migration_record(&mut conn, migration.name());
+    }
+    info!("Mark all migrations as applied");
+  }
+}
+
 pub(crate) fn run_collab_data_migration(
   session: &Session,
   user: &UserProfile,
   collab_db: Arc<CollabKVDB>,
   sqlite_pool: Arc<ConnectionPool>,
+  kv: Arc<KVStorePreferences>,
+  app_version: &Version,
 ) {
-  // ⚠️The order of migrations is crucial. If you're adding a new migration, please ensure
-  // it's appended to the end of the list.
-  let migrations: Vec<Box<dyn UserDataMigration>> = vec![
-    Box::new(HistoricalEmptyDocumentMigration),
-    Box::new(FavoriteV1AndWorkspaceArrayMigration),
-    Box::new(WorkspaceTrashMapToSectionMigration),
-  ];
-  match UserLocalDataMigration::new(session.clone(), collab_db, sqlite_pool)
-    .run(migrations, &user.authenticator)
-  {
+  let migrations = collab_migration_list();
+  match UserLocalDataMigration::new(session.clone(), collab_db, sqlite_pool, kv).run(
+    migrations,
+    &user.authenticator,
+    app_version,
+  ) {
     Ok(applied_migrations) => {
       if !applied_migrations.is_empty() {
-        info!("Did apply migrations: {:?}", applied_migrations);
+        info!(
+          "[Migration]: did apply migrations: {:?}",
+          applied_migrations
+        );
       }
     },
-    Err(e) => error!("User data migration failed: {:?}", e),
+    Err(e) => error!("[AppflowyData]:User data migration failed: {:?}", e),
   }
 }
 

@@ -8,6 +8,7 @@ use std::sync::{Arc, Weak};
 
 use collab_document::blocks::{
   BlockAction, BlockActionPayload, BlockActionType, BlockEvent, BlockEventPayload, DeltaType,
+  DocumentData,
 };
 
 use flowy_error::{FlowyError, FlowyResult};
@@ -30,6 +31,22 @@ fn upgrade_document(
     .upgrade()
     .ok_or(FlowyError::internal().with_context("The document manager is already dropped"))?;
   Ok(manager)
+}
+
+// Handler for getting the document state
+#[instrument(level = "debug", skip_all, err)]
+pub(crate) async fn get_encode_collab_handler(
+  data: AFPluginData<OpenDocumentPayloadPB>,
+  manager: AFPluginState<Weak<DocumentManager>>,
+) -> DataResult<EncodedCollabPB, FlowyError> {
+  let manager = upgrade_document(manager)?;
+  let params: OpenDocumentParams = data.into_inner().try_into()?;
+  let doc_id = params.document_id;
+  let state = manager.get_encoded_collab_with_view_id(&doc_id).await?;
+  data_result_ok(EncodedCollabPB {
+    state_vector: Vec::from(state.state_vector),
+    doc_state: Vec::from(state.doc_state),
+  })
 }
 
 // Handler for creating a new document
@@ -55,8 +72,10 @@ pub(crate) async fn open_document_handler(
   let manager = upgrade_document(manager)?;
   let params: OpenDocumentParams = data.into_inner().try_into()?;
   let doc_id = params.document_id;
-  let document = manager.get_document(&doc_id).await?;
-  let document_data = document.lock().get_document_data()?;
+  manager.open_document(&doc_id).await?;
+
+  let document = manager.editable_document(&doc_id).await?;
+  let document_data = document.read().await.get_document_data()?;
   data_result_ok(DocumentDataPB::from(document_data))
 }
 
@@ -84,6 +103,17 @@ pub(crate) async fn get_document_data_handler(
   data_result_ok(DocumentDataPB::from(document_data))
 }
 
+pub(crate) async fn get_document_text_handler(
+  data: AFPluginData<OpenDocumentPayloadPB>,
+  manager: AFPluginState<Weak<DocumentManager>>,
+) -> DataResult<DocumentTextPB, FlowyError> {
+  let manager = upgrade_document(manager)?;
+  let params: OpenDocumentParams = data.into_inner().try_into()?;
+  let doc_id = params.document_id;
+  let text = manager.get_document_text(&doc_id).await?;
+  data_result_ok(DocumentTextPB { text })
+}
+
 // Handler for applying an action to a document
 pub(crate) async fn apply_action_handler(
   data: AFPluginData<ApplyActionPayloadPB>,
@@ -92,9 +122,12 @@ pub(crate) async fn apply_action_handler(
   let manager = upgrade_document(manager)?;
   let params: ApplyActionParams = data.into_inner().try_into()?;
   let doc_id = params.document_id;
-  let document = manager.get_document(&doc_id).await?;
+  let document = manager.editable_document(&doc_id).await?;
   let actions = params.actions;
-  document.lock().apply_action(actions);
+  if cfg!(feature = "verbose_log") {
+    tracing::trace!("{} applying actions: {:?}", doc_id, actions);
+  }
+  document.write().await.apply_action(actions)?;
   Ok(())
 }
 
@@ -106,9 +139,9 @@ pub(crate) async fn create_text_handler(
   let manager = upgrade_document(manager)?;
   let params: TextDeltaParams = data.into_inner().try_into()?;
   let doc_id = params.document_id;
-  let document = manager.get_document(&doc_id).await?;
-  let document = document.lock();
-  document.create_text(&params.text_id, params.delta);
+  let document = manager.editable_document(&doc_id).await?;
+  let mut document = document.write().await;
+  document.apply_text_delta(&params.text_id, params.delta);
   Ok(())
 }
 
@@ -120,10 +153,13 @@ pub(crate) async fn apply_text_delta_handler(
   let manager = upgrade_document(manager)?;
   let params: TextDeltaParams = data.into_inner().try_into()?;
   let doc_id = params.document_id;
-  let document = manager.get_document(&doc_id).await?;
+  let document = manager.editable_document(&doc_id).await?;
   let text_id = params.text_id;
   let delta = params.delta;
-  let document = document.lock();
+  let mut document = document.write().await;
+  if cfg!(feature = "verbose_log") {
+    tracing::trace!("{} applying delta: {:?}", doc_id, delta);
+  }
   document.apply_text_delta(&text_id, delta);
   Ok(())
 }
@@ -158,8 +194,8 @@ pub(crate) async fn redo_handler(
   let manager = upgrade_document(manager)?;
   let params: DocumentRedoUndoParams = data.into_inner().try_into()?;
   let doc_id = params.document_id;
-  let document = manager.get_document(&doc_id).await?;
-  let document = document.lock();
+  let document = manager.editable_document(&doc_id).await?;
+  let mut document = document.write().await;
   let redo = document.redo();
   let can_redo = document.can_redo();
   let can_undo = document.can_undo();
@@ -177,8 +213,8 @@ pub(crate) async fn undo_handler(
   let manager = upgrade_document(manager)?;
   let params: DocumentRedoUndoParams = data.into_inner().try_into()?;
   let doc_id = params.document_id;
-  let document = manager.get_document(&doc_id).await?;
-  let document = document.lock();
+  let document = manager.editable_document(&doc_id).await?;
+  let mut document = document.write().await;
   let undo = document.undo();
   let can_redo = document.can_redo();
   let can_undo = document.can_undo();
@@ -196,11 +232,10 @@ pub(crate) async fn can_undo_redo_handler(
   let manager = upgrade_document(manager)?;
   let params: DocumentRedoUndoParams = data.into_inner().try_into()?;
   let doc_id = params.document_id;
-  let document = manager.get_document(&doc_id).await?;
-  let document = document.lock();
+  let document = manager.editable_document(&doc_id).await?;
+  let document = document.read().await;
   let can_redo = document.can_redo();
   let can_undo = document.can_undo();
-  drop(document);
   data_result_ok(DocumentRedoUndoResponsePB {
     can_redo,
     can_undo,
@@ -293,12 +328,15 @@ impl From<DeltaType> for DeltaTypePB {
   }
 }
 
-impl From<(&Vec<BlockEvent>, bool)> for DocEventPB {
-  fn from((events, is_remote): (&Vec<BlockEvent>, bool)) -> Self {
+impl From<(&Vec<BlockEvent>, bool, Option<DocumentData>)> for DocEventPB {
+  fn from(
+    (events, is_remote, new_snapshot): (&Vec<BlockEvent>, bool, Option<DocumentData>),
+  ) -> Self {
     // Convert each individual `BlockEvent` to a protobuf `BlockEventPB`, and collect the results into a `Vec`
     Self {
       events: events.iter().map(|e| e.to_owned().into()).collect(),
       is_remote,
+      new_snapshot: new_snapshot.map(|d| d.into()),
     }
   }
 }
@@ -349,8 +387,7 @@ pub async fn convert_document_handler(
   let manager = upgrade_document(manager)?;
   let params: ConvertDocumentParams = data.into_inner().try_into()?;
 
-  let document = manager.get_document(&params.document_id).await?;
-  let document_data = document.lock().get_document_data()?;
+  let document_data = manager.get_document_data(&params.document_id).await?;
   let parser = DocumentDataParser::new(Arc::new(document_data), params.range);
 
   if !params.parse_types.any_enabled() {
@@ -408,32 +445,39 @@ pub(crate) async fn upload_file_handler(
   params: AFPluginData<UploadFileParamsPB>,
   manager: AFPluginState<Weak<DocumentManager>>,
 ) -> DataResult<UploadedFilePB, FlowyError> {
-  let AFPluginData(UploadFileParamsPB {
+  let UploadFileParamsPB {
     workspace_id,
+    document_id,
     local_file_path,
-    is_async,
-  }) = params;
+  } = params.try_into_inner()?;
 
   let manager = upgrade_document(manager)?;
-  let url = manager
-    .upload_file(workspace_id, &local_file_path, is_async)
-    .await?;
+  let (tx, rx) = tokio::sync::oneshot::channel();
+  let cloned_local_file_path = local_file_path.clone();
+  tokio::spawn(async move {
+    let result = manager
+      .upload_file(workspace_id, &document_id, &cloned_local_file_path)
+      .await;
 
-  Ok(AFPluginData(UploadedFilePB {
-    url,
+    let _ = tx.send(result);
+    Ok::<(), FlowyError>(())
+  });
+  let upload = rx.await??;
+  data_result_ok(UploadedFilePB {
+    url: upload.url,
     local_file_path,
-  }))
+  })
 }
 
 #[instrument(level = "debug", skip_all, err)]
 pub(crate) async fn download_file_handler(
-  params: AFPluginData<UploadedFilePB>,
+  params: AFPluginData<DownloadFilePB>,
   manager: AFPluginState<Weak<DocumentManager>>,
 ) -> FlowyResult<()> {
-  let AFPluginData(UploadedFilePB {
+  let DownloadFilePB {
     url,
     local_file_path,
-  }) = params;
+  } = params.try_into_inner()?;
 
   let manager = upgrade_document(manager)?;
   manager.download_file(local_file_path, url).await
@@ -441,13 +485,26 @@ pub(crate) async fn download_file_handler(
 
 // Handler for deleting file
 pub(crate) async fn delete_file_handler(
-  params: AFPluginData<UploadedFilePB>,
+  params: AFPluginData<DownloadFilePB>,
   manager: AFPluginState<Weak<DocumentManager>>,
 ) -> FlowyResult<()> {
-  let AFPluginData(UploadedFilePB {
+  let DownloadFilePB {
     url,
-    local_file_path,
-  }) = params;
+    local_file_path: _,
+  } = params.try_into_inner()?;
   let manager = upgrade_document(manager)?;
-  manager.delete_file(local_file_path, url).await
+  manager.delete_file(url).await
+}
+
+pub(crate) async fn set_awareness_local_state_handler(
+  data: AFPluginData<UpdateDocumentAwarenessStatePB>,
+  manager: AFPluginState<Weak<DocumentManager>>,
+) -> FlowyResult<()> {
+  let manager = upgrade_document(manager)?;
+  let data = data.into_inner();
+  let doc_id = data.document_id.clone();
+  manager
+    .set_document_awareness_local_state(&doc_id, data)
+    .await?;
+  Ok(())
 }

@@ -51,11 +51,7 @@ class TestWorkspaceService {
   Future<void> setUpAll() async {
     final root = await workspace.root;
     final path = root.path;
-    SharedPreferences.setMockInitialValues(
-      {
-        KVKeys.pathLocation: path,
-      },
-    );
+    SharedPreferences.setMockInitialValues({KVKeys.pathLocation: path});
   }
 
   /// Workspaces that are checked into source are compressed. [TestWorkspaceService.setUp()] decompresses the file into an ephemeral directory that will be ignored by source control.
@@ -63,7 +59,7 @@ class TestWorkspaceService {
     final inputStream =
         InputFileStream(await workspace.zip.then((value) => value.path));
     final archive = ZipDecoder().decodeBuffer(inputStream);
-    extractArchiveToDisk(
+    await extractArchiveToDisk(
       archive,
       await TestWorkspace._parent.then((value) => value.path),
     );

@@ -4,10 +4,10 @@ import 'package:appflowy/plugins/database/widgets/cell_editor/extension.dart';
 import 'package:appflowy/plugins/database/widgets/cell_editor/mobile_select_option_editor.dart';
 import 'package:appflowy/plugins/database/application/cell/bloc/select_option_cell_bloc.dart';
 import 'package:appflowy_backend/protobuf/flowy-database2/select_option_entities.pb.dart';
-import 'package:appflowy_popover/appflowy_popover.dart';
 import 'package:collection/collection.dart';
 import 'package:flowy_infra_ui/flowy_infra_ui.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../editable_cell_skeleton/select_option.dart';
 
@@ -17,25 +17,28 @@ class MobileGridSelectOptionCellSkin extends IEditableSelectOptionCellSkin {
     BuildContext context,
     CellContainerNotifier cellContainerNotifier,
     SelectOptionCellBloc bloc,
-    SelectOptionCellState state,
     PopoverController popoverController,
   ) {
-    return FlowyButton(
-      hoverColor: Colors.transparent,
-      radius: BorderRadius.zero,
-      margin: EdgeInsets.zero,
-      text: Align(
-        alignment: AlignmentDirectional.centerStart,
-        child: state.selectedOptions.isEmpty
-            ? const SizedBox.shrink()
-            : _buildOptions(context, state.selectedOptions),
-      ),
-      onTap: () {
-        showMobileBottomSheet(
-          context,
-          builder: (context) {
-            return MobileSelectOptionEditor(
-              cellController: bloc.cellController,
+    return BlocBuilder<SelectOptionCellBloc, SelectOptionCellState>(
+      builder: (context, state) {
+        return FlowyButton(
+          hoverColor: Colors.transparent,
+          radius: BorderRadius.zero,
+          margin: EdgeInsets.zero,
+          text: Align(
+            alignment: AlignmentDirectional.centerStart,
+            child: state.selectedOptions.isEmpty
+                ? const SizedBox.shrink()
+                : _buildOptions(context, state.selectedOptions),
+          ),
+          onTap: () {
+            showMobileBottomSheet(
+              context,
+              builder: (context) {
+                return MobileSelectOptionEditor(
+                  cellController: bloc.cellController,
+                );
+              },
             );
           },
         );

@@ -1,9 +1,9 @@
-import 'dart:collection';
 import 'dart:convert';
 
 import 'package:appflowy/core/config/kv.dart';
 import 'package:appflowy/core/config/kv_keys.dart';
 import 'package:appflowy/startup/startup.dart';
+import 'package:collection/collection.dart';
 
 typedef FeatureFlagMap = Map<FeatureFlag, bool>;
 
@@ -19,16 +19,42 @@ enum FeatureFlag {
 
   // used to control the visibility of the members settings
   // if it's on, you can see the members settings in the settings page
-  membersSettings;
+  membersSettings,
+
+  // used to control the sync feature of the document
+  // if it's on, the document will be synced the events from server in real-time
+  syncDocument,
+
+  // used to control the sync feature of the database
+  // if it's on, the collaborators will show in the database
+  syncDatabase,
+
+  // used for the search feature
+  search,
+
+  // used for controlling whether to show plan+billing options in settings
+  planBilling,
+
+  // used for space design
+  spaceDesign,
+
+  // used for the inline sub-page mention
+  inlineSubPageMention,
+
+  // used for ignore the conflicted feature flag
+  unknown;
 
   static Future<void> initialize() async {
     final values = await getIt<KeyValueStorage>().getWithFormat<FeatureFlagMap>(
           KVKeys.featureFlag,
           (value) => Map.from(jsonDecode(value)).map(
-            (key, value) => MapEntry(
-              FeatureFlag.values.firstWhere((e) => e.name == key),
-              value as bool,
-            ),
+            (key, value) {
+              final k = FeatureFlag.values.firstWhereOrNull(
+                    (e) => e.name == key,
+                  ) ??
+                  FeatureFlag.unknown;
+              return MapEntry(k, value as bool);
+            },
           ),
         ) ??
         {};
@@ -67,14 +93,38 @@ enum FeatureFlag {
   }
 
   bool get isOn {
+    if ([
+      FeatureFlag.planBilling,
+      // release this feature in version 0.6.1
+      FeatureFlag.spaceDesign,
+      // release this feature in version 0.5.9
+      FeatureFlag.search,
+      // release this feature in version 0.5.6
+      FeatureFlag.collaborativeWorkspace,
+      FeatureFlag.membersSettings,
+      // release this feature in version 0.5.4
+      FeatureFlag.syncDatabase,
+      FeatureFlag.syncDocument,
+      FeatureFlag.inlineSubPageMention,
+    ].contains(this)) {
+      return true;
+    }
+
     if (_values.containsKey(this)) {
       return _values[this]!;
     }
 
     switch (this) {
+      case FeatureFlag.planBilling:
+      case FeatureFlag.search:
+      case FeatureFlag.syncDocument:
+      case FeatureFlag.syncDatabase:
+      case FeatureFlag.spaceDesign:
+      case FeatureFlag.inlineSubPageMention:
+        return true;
       case FeatureFlag.collaborativeWorkspace:
-        return false;
       case FeatureFlag.membersSettings:
+      case FeatureFlag.unknown:
         return false;
     }
   }
@@ -85,6 +135,20 @@ enum FeatureFlag {
         return 'if it\'s on, you can see the workspace list and the workspace settings in the top-left corner of the app';
       case FeatureFlag.membersSettings:
         return 'if it\'s on, you can see the members settings in the settings page';
+      case FeatureFlag.syncDocument:
+        return 'if it\'s on, the document will be synced in real-time';
+      case FeatureFlag.syncDatabase:
+        return 'if it\'s on, the collaborators will show in the database';
+      case FeatureFlag.search:
+        return 'if it\'s on, the command palette and search button will be available';
+      case FeatureFlag.planBilling:
+        return 'if it\'s on, plan and billing pages will be available in Settings';
+      case FeatureFlag.spaceDesign:
+        return 'if it\'s on, the space design feature will be available';
+      case FeatureFlag.inlineSubPageMention:
+        return 'if it\'s on, the inline sub-page mention feature will be available';
+      case FeatureFlag.unknown:
+        return '';
     }
   }
 

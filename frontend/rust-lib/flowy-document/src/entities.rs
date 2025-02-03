@@ -1,7 +1,13 @@
 use std::collections::HashMap;
 
 use collab::core::collab_state::SyncState;
-use collab_document::blocks::{json_str_to_hashmap, Block, BlockAction, DocumentData};
+use collab_document::{
+  blocks::{json_str_to_hashmap, Block, BlockAction, DocumentData},
+  document_awareness::{
+    DocumentAwarenessPosition, DocumentAwarenessSelection, DocumentAwarenessState,
+    DocumentAwarenessUser,
+  },
+};
 
 use flowy_derive::{ProtoBuf, ProtoBuf_Enum};
 use flowy_error::ErrorCode;
@@ -9,6 +15,14 @@ use lib_infra::validator_fn::{required_not_empty_str, required_valid_path};
 use validator::Validate;
 
 use crate::parse::{NotEmptyStr, NotEmptyVec};
+
+#[derive(Default, ProtoBuf)]
+pub struct EncodedCollabPB {
+  #[pb(index = 1)]
+  pub state_vector: Vec<u8>,
+  #[pb(index = 2)]
+  pub doc_state: Vec<u8>,
+}
 
 #[derive(Default, ProtoBuf)]
 pub struct OpenDocumentPayloadPB {
@@ -67,15 +81,16 @@ pub struct DocumentRedoUndoResponsePB {
 #[derive(Default, ProtoBuf, Validate)]
 pub struct UploadFileParamsPB {
   #[pb(index = 1)]
-  #[validate(custom = "required_not_empty_str")]
+  #[validate(custom(function = "required_not_empty_str"))]
   pub workspace_id: String,
 
   #[pb(index = 2)]
-  #[validate(custom = "required_valid_path")]
-  pub local_file_path: String,
+  #[validate(custom(function = "required_not_empty_str"))]
+  pub document_id: String,
 
   #[pb(index = 3)]
-  pub is_async: bool,
+  #[validate(custom(function = "required_valid_path"))]
+  pub local_file_path: String,
 }
 
 #[derive(Default, ProtoBuf, Validate)]
@@ -85,7 +100,18 @@ pub struct UploadedFilePB {
   pub url: String,
 
   #[pb(index = 2)]
-  #[validate(custom = "required_valid_path")]
+  #[validate(custom(function = "required_valid_path"))]
+  pub local_file_path: String,
+}
+
+#[derive(Default, ProtoBuf, Validate)]
+pub struct DownloadFilePB {
+  #[pb(index = 1)]
+  #[validate(url)]
+  pub url: String,
+
+  #[pb(index = 2)]
+  #[validate(custom(function = "required_valid_path"))]
   pub local_file_path: String,
 }
 
@@ -177,6 +203,11 @@ pub struct DocumentDataPB {
   pub meta: MetaPB,
 }
 
+#[derive(Default, Debug, ProtoBuf)]
+pub struct DocumentTextPB {
+  #[pb(index = 1)]
+  pub text: String,
+}
 #[derive(Default, ProtoBuf, Debug, Clone)]
 pub struct BlockPB {
   #[pb(index = 1)]
@@ -301,6 +332,9 @@ pub struct DocEventPB {
 
   #[pb(index = 2)]
   pub is_remote: bool,
+
+  #[pb(index = 3, one_of)]
+  pub new_snapshot: Option<DocumentDataPB>,
 }
 
 #[derive(Default, ProtoBuf)]
@@ -330,6 +364,7 @@ pub enum ExportType {
   Text = 0,
   Markdown = 1,
   Link = 2,
+  HTML = 3,
 }
 
 impl From<i32> for ExportType {
@@ -338,6 +373,7 @@ impl From<i32> for ExportType {
       0 => ExportType::Text,
       1 => ExportType::Markdown,
       2 => ExportType::Link,
+      3 => ExportType::HTML,
       _ => {
         tracing::error!("🔴Invalid export type: {}", val);
         ExportType::Text
@@ -445,14 +481,27 @@ pub struct DocumentSnapshotStatePB {
 #[derive(Debug, Default, ProtoBuf)]
 pub struct DocumentSyncStatePB {
   #[pb(index = 1)]
-  pub is_syncing: bool,
+  pub value: DocumentSyncState,
+}
+
+#[derive(Debug, Default, ProtoBuf_Enum, PartialEq, Eq, Clone, Copy)]
+pub enum DocumentSyncState {
+  #[default]
+  InitSyncBegin = 0,
+  InitSyncEnd = 1,
+  Syncing = 2,
+  SyncFinished = 3,
 }
 
 impl From<SyncState> for DocumentSyncStatePB {
   fn from(value: SyncState) -> Self {
-    Self {
-      is_syncing: value.is_syncing(),
-    }
+    let value = match value {
+      SyncState::InitSyncBegin => DocumentSyncState::InitSyncBegin,
+      SyncState::InitSyncEnd => DocumentSyncState::InitSyncEnd,
+      SyncState::Syncing => DocumentSyncState::Syncing,
+      SyncState::SyncFinished => DocumentSyncState::SyncFinished,
+    };
+    Self { value }
   }
 }
 
@@ -498,4 +547,125 @@ pub struct DocumentSnapshotMeta {
 pub struct DocumentSnapshotData {
   pub object_id: String,
   pub encoded_v1: Vec<u8>,
+}
+
+#[derive(ProtoBuf, Debug, Default)]
+pub struct DocumentAwarenessStatesPB {
+  #[pb(index = 1)]
+  pub value: HashMap<String, DocumentAwarenessStatePB>,
+}
+
+impl From<HashMap<u64, DocumentAwarenessState>> for DocumentAwarenessStatesPB {
+  fn from(value: HashMap<u64, DocumentAwarenessState>) -> Self {
+    let value = value
+      .into_iter()
+      .map(|(k, v)| (k.to_string(), v.into()))
+      .collect();
+    Self { value }
+  }
+}
+
+#[derive(ProtoBuf, Debug, Default)]
+pub struct UpdateDocumentAwarenessStatePB {
+  #[pb(index = 1)]
+  pub document_id: String,
+  #[pb(index = 2, one_of)]
+  pub selection: Option<DocumentAwarenessSelectionPB>,
+  #[pb(index = 3, one_of)]
+  pub metadata: Option<String>,
+}
+
+#[derive(ProtoBuf, Debug, Default)]
+pub struct DocumentAwarenessStatePB {
+  #[pb(index = 1)]
+  pub version: i64,
+  #[pb(index = 2)]
+  pub user: DocumentAwarenessUserPB,
+  #[pb(index = 3, one_of)]
+  pub selection: Option<DocumentAwarenessSelectionPB>,
+  #[pb(index = 4, one_of)]
+  pub metadata: Option<String>,
+  #[pb(index = 5)]
+  pub timestamp: i64,
+}
+
+impl From<DocumentAwarenessState> for DocumentAwarenessStatePB {
+  fn from(value: DocumentAwarenessState) -> Self {
+    DocumentAwarenessStatePB {
+      version: value.version,
+      user: value.user.into(),
+      selection: value.selection.map(|s| s.into()),
+      metadata: value.metadata,
+      timestamp: value.timestamp,
+    }
+  }
+}
+
+#[derive(ProtoBuf, Debug, Default)]
+pub struct DocumentAwarenessUserPB {
+  #[pb(index = 1)]
+  pub uid: i64,
+  #[pb(index = 2)]
+  pub device_id: String,
+}
+
+impl From<DocumentAwarenessUser> for DocumentAwarenessUserPB {
+  fn from(value: DocumentAwarenessUser) -> Self {
+    DocumentAwarenessUserPB {
+      uid: value.uid,
+      device_id: value.device_id.to_string(),
+    }
+  }
+}
+
+#[derive(ProtoBuf, Debug, Default)]
+pub struct DocumentAwarenessSelectionPB {
+  #[pb(index = 1)]
+  pub start: DocumentAwarenessPositionPB,
+  #[pb(index = 2)]
+  pub end: DocumentAwarenessPositionPB,
+}
+
+#[derive(ProtoBuf, Debug, Default)]
+pub struct DocumentAwarenessPositionPB {
+  #[pb(index = 1)]
+  pub path: Vec<u64>,
+  #[pb(index = 2)]
+  pub offset: u64,
+}
+
+impl From<DocumentAwarenessSelectionPB> for DocumentAwarenessSelection {
+  fn from(value: DocumentAwarenessSelectionPB) -> Self {
+    DocumentAwarenessSelection {
+      start: value.start.into(),
+      end: value.end.into(),
+    }
+  }
+}
+
+impl From<DocumentAwarenessSelection> for DocumentAwarenessSelectionPB {
+  fn from(value: DocumentAwarenessSelection) -> Self {
+    DocumentAwarenessSelectionPB {
+      start: value.start.into(),
+      end: value.end.into(),
+    }
+  }
+}
+
+impl From<DocumentAwarenessPositionPB> for DocumentAwarenessPosition {
+  fn from(value: DocumentAwarenessPositionPB) -> Self {
+    DocumentAwarenessPosition {
+      path: value.path,
+      offset: value.offset,
+    }
+  }
+}
+
+impl From<DocumentAwarenessPosition> for DocumentAwarenessPositionPB {
+  fn from(value: DocumentAwarenessPosition) -> Self {
+    DocumentAwarenessPositionPB {
+      path: value.path,
+      offset: value.offset,
+    }
+  }
 }

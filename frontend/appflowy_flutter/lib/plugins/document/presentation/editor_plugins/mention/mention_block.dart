@@ -8,12 +8,13 @@ import 'package:provider/provider.dart';
 
 enum MentionType {
   page,
-  reminder,
-  date;
+  date,
+  childPage;
 
   static MentionType fromString(String value) => switch (value) {
         'page' => page,
         'date' => date,
+        'childPage' => childPage,
         // Backwards compatibility
         'reminder' => date,
         _ => throw UnimplementedError(),
@@ -25,7 +26,7 @@ Node dateMentionNode() {
     delta: Delta(
       operations: [
         TextInsert(
-          '\$',
+          MentionBlockKeys.mentionChar,
           attributes: {
             MentionBlockKeys.mention: {
               MentionBlockKeys.type: MentionType.date.name,
@@ -45,11 +46,14 @@ class MentionBlockKeys {
   static const mention = 'mention';
   static const type = 'type'; // MentionType, String
   static const pageId = 'page_id';
+  static const blockId = 'block_id';
 
   // Related to Reminder and Date blocks
   static const date = 'date'; // Start Date
   static const includeTime = 'include_time';
   static const reminderOption = 'reminder_option';
+
+  static const mentionChar = '\$';
 }
 
 class MentionBlock extends StatelessWidget {
@@ -69,18 +73,42 @@ class MentionBlock extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final type = MentionType.fromString(mention[MentionBlockKeys.type]);
+    final editorState = context.read<EditorState>();
 
     switch (type) {
       case MentionType.page:
-        final String pageId = mention[MentionBlockKeys.pageId];
+        final String? pageId = mention[MentionBlockKeys.pageId] as String?;
+        if (pageId == null) {
+          return const SizedBox.shrink();
+        }
+        final String? blockId = mention[MentionBlockKeys.blockId] as String?;
+
         return MentionPageBlock(
           key: ValueKey(pageId),
+          editorState: editorState,
           pageId: pageId,
+          blockId: blockId,
+          node: node,
           textStyle: textStyle,
+          index: index,
         );
+      case MentionType.childPage:
+        final String? pageId = mention[MentionBlockKeys.pageId] as String?;
+        if (pageId == null) {
+          return const SizedBox.shrink();
+        }
+
+        return MentionSubPageBlock(
+          key: ValueKey(pageId),
+          editorState: editorState,
+          pageId: pageId,
+          node: node,
+          textStyle: textStyle,
+          index: index,
+        );
+
       case MentionType.date:
         final String date = mention[MentionBlockKeys.date];
-        final editorState = context.read<EditorState>();
         final reminderOption = ReminderOption.values.firstWhereOrNull(
           (o) => o.name == mention[MentionBlockKeys.reminderOption],
         );
@@ -90,9 +118,10 @@ class MentionBlock extends StatelessWidget {
           editorState: editorState,
           date: date,
           node: node,
+          textStyle: textStyle,
           index: index,
           reminderId: mention[MentionBlockKeys.reminderId],
-          reminderOption: reminderOption,
+          reminderOption: reminderOption ?? ReminderOption.none,
           includeTime: mention[MentionBlockKeys.includeTime] ?? false,
         );
       default:

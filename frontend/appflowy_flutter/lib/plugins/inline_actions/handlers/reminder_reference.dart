@@ -1,8 +1,6 @@
-import 'package:flutter/material.dart';
-
 import 'package:appflowy/date/date_service.dart';
 import 'package:appflowy/generated/locale_keys.g.dart';
-import 'package:appflowy/plugins/document/application/doc_bloc.dart';
+import 'package:appflowy/plugins/document/application/document_bloc.dart';
 import 'package:appflowy/plugins/document/presentation/editor_plugins/base/string_extension.dart';
 import 'package:appflowy/plugins/document/presentation/editor_plugins/mention/mention_block.dart';
 import 'package:appflowy/plugins/inline_actions/inline_actions_result.dart';
@@ -14,6 +12,7 @@ import 'package:appflowy_backend/protobuf/flowy-user/reminder.pb.dart';
 import 'package:appflowy_editor/appflowy_editor.dart';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:fixnum/fixnum.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:nanoid/nanoid.dart';
 
@@ -140,7 +139,7 @@ class ReminderReferenceService extends InlineActionsDelegate {
       return;
     }
 
-    final viewId = context.read<DocumentBloc>().view.id;
+    final viewId = context.read<DocumentBloc>().documentId;
     final reminder = _reminderFromDate(date, viewId, node);
 
     final transaction = editorState.transaction
@@ -148,7 +147,7 @@ class ReminderReferenceService extends InlineActionsDelegate {
         node,
         start,
         end,
-        '\$',
+        MentionBlockKeys.mentionChar,
         attributes: {
           MentionBlockKeys.mention: {
             MentionBlockKeys.type: MentionType.date.name,
@@ -171,17 +170,32 @@ class ReminderReferenceService extends InlineActionsDelegate {
     final tomorrow = today.add(const Duration(days: 1));
     final oneWeek = today.add(const Duration(days: 7));
 
-    _allOptions = [
-      _itemFromDate(
+    late InlineActionsMenuItem todayItem;
+    late InlineActionsMenuItem oneWeekItem;
+
+    try {
+      todayItem = _itemFromDate(
         tomorrow,
         LocaleKeys.relativeDates_tomorrow.tr(),
         [DateFormat.yMd(_locale).format(tomorrow)],
-      ),
-      _itemFromDate(
+      );
+    } catch (e) {
+      todayItem = _itemFromDate(today);
+    }
+
+    try {
+      oneWeekItem = _itemFromDate(
         oneWeek,
         LocaleKeys.relativeDates_oneWeek.tr(),
         [DateFormat.yMd(_locale).format(oneWeek)],
-      ),
+      );
+    } catch (e) {
+      oneWeekItem = _itemFromDate(oneWeek);
+    }
+
+    _allOptions = [
+      todayItem,
+      oneWeekItem,
     ];
   }
 
@@ -201,7 +215,17 @@ class ReminderReferenceService extends InlineActionsDelegate {
     String? label,
     List<String>? keywords,
   ]) {
-    final labelStr = label ?? DateFormat.yMd(_locale).format(date);
+    late String labelStr;
+    if (label != null) {
+      labelStr = label;
+    } else {
+      try {
+        labelStr = DateFormat.yMd(_locale).format(date);
+      } catch (e) {
+        // fallback to en-US
+        labelStr = DateFormat.yMd('en-US').format(date);
+      }
+    }
 
     return InlineActionsMenuItem(
       label: labelStr.capitalize(),
@@ -220,6 +244,8 @@ class ReminderReferenceService extends InlineActionsDelegate {
       meta: {
         ReminderMetaKeys.includeTime: false.toString(),
         ReminderMetaKeys.blockId: node.id,
+        ReminderMetaKeys.createdAt:
+            DateTime.now().millisecondsSinceEpoch.toString(),
       },
       scheduledAt: Int64(date.millisecondsSinceEpoch ~/ 1000),
       isAck: date.isBefore(DateTime.now()),

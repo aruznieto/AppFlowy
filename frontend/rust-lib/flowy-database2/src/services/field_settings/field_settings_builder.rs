@@ -1,13 +1,13 @@
-use std::collections::HashMap;
-
+use collab::preclude::Any;
 use collab_database::fields::Field;
 use collab_database::views::{
   DatabaseLayout, FieldSettingsByFieldIdMap, FieldSettingsMap, FieldSettingsMapBuilder,
 };
+use std::collections::HashMap;
 use strum::IntoEnumIterator;
 
 use crate::entities::FieldVisibility;
-use crate::services::field_settings::{FieldSettings, VISIBILITY};
+use crate::services::field_settings::{FieldSettings, DEFAULT_WIDTH, VISIBILITY};
 
 /// Helper struct to create a new field setting
 pub struct FieldSettingsBuilder {
@@ -19,8 +19,10 @@ impl FieldSettingsBuilder {
     let field_settings = FieldSettings {
       field_id: field_id.to_string(),
       visibility: FieldVisibility::AlwaysShown,
-      width: 150,
+      width: DEFAULT_WIDTH,
+      wrap_cell_content: true,
     };
+
     Self {
       inner: field_settings,
     }
@@ -84,9 +86,8 @@ pub fn default_field_settings_by_layout_map() -> HashMap<DatabaseLayout, FieldSe
   let mut map = HashMap::new();
   for layout_ty in DatabaseLayout::iter() {
     let visibility = default_field_visibility(layout_ty);
-    let field_settings = FieldSettingsMapBuilder::new()
-      .insert_i64_value(VISIBILITY, visibility.into())
-      .build();
+    let field_settings =
+      FieldSettingsMapBuilder::from([(VISIBILITY.into(), Any::BigInt(i64::from(visibility)))]);
     map.insert(layout_ty, field_settings);
   }
 

@@ -1,4 +1,3 @@
-import 'package:appflowy/generated/locale_keys.g.dart';
 import 'package:appflowy/plugins/database/board/presentation/board_page.dart';
 import 'package:appflowy/plugins/database/calendar/presentation/calendar_page.dart';
 import 'package:appflowy/plugins/database/grid/presentation/grid_page.dart';
@@ -8,7 +7,6 @@ import 'package:appflowy/workspace/presentation/home/menu/view/view_item.dart';
 import 'package:appflowy/workspace/presentation/home/menu/view/view_more_action_button.dart';
 import 'package:appflowy_backend/protobuf/flowy-folder/view.pb.dart';
 import 'package:appflowy_editor/appflowy_editor.dart';
-import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
 
@@ -17,18 +15,16 @@ import '../../shared/util.dart';
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
 
-  group('sidebar test', () {
+  group('sidebar:', () {
     testWidgets('create a new page', (tester) async {
       await tester.initializeAppFlowy();
-      await tester.tapGoButton();
+      await tester.tapAnonymousSignInButton();
 
       // create a new page
       await tester.tapNewPageButton();
 
       // expect to see a new document
-      tester.expectToSeePageName(
-        LocaleKeys.menuAppHeader_defaultNewPageName.tr(),
-      );
+      tester.expectToSeePageName('');
       // and with one paragraph block
       expect(find.byType(ParagraphBlockComponentWidget), findsOneWidget);
     });
@@ -36,9 +32,12 @@ void main() {
     testWidgets('create a new document, grid, board and calendar',
         (tester) async {
       await tester.initializeAppFlowy();
-      await tester.tapGoButton();
+      await tester.tapAnonymousSignInButton();
 
       for (final layout in ViewLayoutPB.values) {
+        if (layout == ViewLayoutPB.Chat) {
+          continue;
+        }
         // create a new page
         final name = 'AppFlowy_$layout';
         await tester.createNewPageWithNameUnderParent(
@@ -61,10 +60,12 @@ void main() {
             expect(find.byType(GridPage), findsOneWidget);
             break;
           case ViewLayoutPB.Board:
-            expect(find.byType(BoardPage), findsOneWidget);
+            expect(find.byType(DesktopBoardPage), findsOneWidget);
             break;
           case ViewLayoutPB.Calendar:
             expect(find.byType(CalendarPage), findsOneWidget);
+            break;
+          case ViewLayoutPB.Chat:
             break;
         }
 
@@ -74,7 +75,7 @@ void main() {
 
     testWidgets('create some nested pages, and move them', (tester) async {
       await tester.initializeAppFlowy();
-      await tester.tapGoButton();
+      await tester.tapAnonymousSignInButton();
 
       final names = [1, 2, 3, 4].map((e) => 'document_$e').toList();
       for (var i = 0; i < names.length; i++) {
@@ -140,7 +141,7 @@ void main() {
 
     testWidgets('unable to move a document into a database', (tester) async {
       await tester.initializeAppFlowy();
-      await tester.tapGoButton();
+      await tester.tapAnonymousSignInButton();
 
       const document = 'document';
       await tester.createNewPageWithNameUnderParent(
@@ -183,7 +184,7 @@ void main() {
     testWidgets('unable to create a new database inside the existing one',
         (tester) async {
       await tester.initializeAppFlowy();
-      await tester.tapGoButton();
+      await tester.tapAnonymousSignInButton();
 
       const grid = 'grid';
       await tester.createNewPageWithNameUnderParent(
@@ -197,7 +198,7 @@ void main() {
         layout: ViewLayoutPB.Grid,
         onHover: () async {
           expect(find.byType(ViewAddButton), findsNothing);
-          expect(find.byType(ViewMoreActionButton), findsOneWidget);
+          expect(find.byType(ViewMoreActionPopover), findsOneWidget);
         },
       );
     });

@@ -14,7 +14,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 class SettingThirdPartyLogin extends StatelessWidget {
-  const SettingThirdPartyLogin({required this.didLogin, super.key});
+  const SettingThirdPartyLogin({
+    super.key,
+    required this.didLogin,
+  });
 
   final VoidCallback didLogin;
 
@@ -42,24 +45,12 @@ class SettingThirdPartyLogin extends StatelessWidget {
               : const SizedBox.shrink();
 
           return Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Row(
-                children: [
-                  FlowyText.medium(
-                    LocaleKeys.signIn_signInWith.tr(),
-                    fontSize: 16,
-                  ),
-                  const HSpace(6),
-                ],
-              ),
-              const VSpace(6),
               promptMessage,
               const VSpace(6),
               indicator,
               const VSpace(6),
               if (isAuthEnabled) const ThirdPartySignInButtons(),
-              const VSpace(6),
             ],
           );
         },

@@ -17,7 +17,8 @@ pub fn init(folder: Weak<FolderManager>) -> AFPlugin {
     .event(FolderEvent::ReadWorkspaceViews, get_workspace_views_handler)
     .event(FolderEvent::CreateView, create_view_handler)
     .event(FolderEvent::CreateOrphanView, create_orphan_view_handler)
-    .event(FolderEvent::GetView, read_view_handler)
+    .event(FolderEvent::GetView, get_view_handler)
+    .event(FolderEvent::GetAllViews, get_all_views_handler)
     .event(FolderEvent::UpdateView, update_view_handler)
     .event(FolderEvent::DeleteView, delete_view_handler)
     .event(FolderEvent::DuplicateView, duplicate_view_handler)
@@ -29,15 +30,29 @@ pub fn init(folder: Weak<FolderManager>) -> AFPlugin {
     .event(FolderEvent::RestoreTrashItem, putback_trash_handler)
     .event(FolderEvent::PermanentlyDeleteTrashItem, delete_trash_handler)
     .event(FolderEvent::RecoverAllTrashItems, restore_all_trash_handler)
-    .event(FolderEvent::PermanentlyDeleteAllTrashItem, delete_all_trash_handler)
+    .event(FolderEvent::PermanentlyDeleteAllTrashItem, delete_my_trash_handler)
     .event(FolderEvent::ImportData, import_data_handler)
+    .event(FolderEvent::ImportZipFile, import_zip_file_handler)
     .event(FolderEvent::GetFolderSnapshots, get_folder_snapshots_handler)
     .event(FolderEvent::UpdateViewIcon, update_view_icon_handler)
     .event(FolderEvent::ReadFavorites, read_favorites_handler)
     .event(FolderEvent::ReadRecentViews, read_recent_views_handler)
     .event(FolderEvent::ToggleFavorite, toggle_favorites_handler)
     .event(FolderEvent::UpdateRecentViews, update_recent_views_handler)
-    .event(FolderEvent::ReloadWorkspace, reload_workspace_handler)
+    .event(FolderEvent::ReadPrivateViews, read_private_views_handler)
+    .event(FolderEvent::ReadCurrentWorkspaceViews, get_current_workspace_views_handler)
+    .event(FolderEvent::UpdateViewVisibilityStatus, update_view_visibility_status_handler)
+    .event(FolderEvent::GetViewAncestors, get_view_ancestors_handler)
+    .event(FolderEvent::PublishView, publish_view_handler)
+    .event(FolderEvent::GetPublishInfo, get_publish_info_handler)
+    .event(FolderEvent::SetPublishName, set_publish_name_handler)
+    .event(FolderEvent::UnpublishViews, unpublish_views_handler)
+    .event(FolderEvent::SetPublishNamespace, set_publish_namespace_handler)
+    .event(FolderEvent::GetPublishNamespace, get_publish_namespace_handler)
+    .event(FolderEvent::ListPublishedViews, list_published_views_handler)
+    .event(FolderEvent::GetDefaultPublishInfo, get_default_publish_info_handler)
+    .event(FolderEvent::SetDefaultPublishView, set_default_publish_view_handler)
+    .event(FolderEvent::RemoveDefaultPublishView, remove_default_publish_view_handler)
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug, Display, Hash, ProtoBuf_Enum, Flowy_Event)]
@@ -59,9 +74,9 @@ pub enum FolderEvent {
   #[event(input = "WorkspaceIdPB")]
   DeleteWorkspace = 3,
 
-  /// Return a list of views of the current workspace.
+  /// Return a list of views of the specified workspace.
   /// Only the first level of child views are included.
-  #[event(input = "WorkspaceIdPB", output = "RepeatedViewPB")]
+  #[event(input = "GetWorkspaceViewPB", output = "RepeatedViewPB")]
   ReadWorkspaceViews = 5,
 
   /// Create a new view in the corresponding app
@@ -81,7 +96,7 @@ pub enum FolderEvent {
   DeleteView = 13,
 
   /// Duplicate the view
-  #[event(input = "ViewPB")]
+  #[event(input = "DuplicateViewPayloadPB", output = "ViewPB")]
   DuplicateView = 14,
 
   /// Close and release the resources that are used by this view.
@@ -92,6 +107,10 @@ pub enum FolderEvent {
   /// Create a new view in the corresponding app
   #[event(input = "CreateOrphanViewPayloadPB", output = "ViewPB")]
   CreateOrphanView = 16,
+
+  /// Return the view info
+  #[event(output = "RepeatedViewPB")]
+  GetAllViews = 17,
 
   #[event()]
   CopyLink = 20,
@@ -124,7 +143,7 @@ pub enum FolderEvent {
   #[event()]
   PermanentlyDeleteAllTrashItem = 27,
 
-  #[event(input = "ImportPB", output = "ViewPB")]
+  #[event(input = "ImportPayloadPB", output = "RepeatedViewPB")]
   ImportData = 30,
 
   #[event(input = "WorkspaceIdPB", output = "RepeatedFolderSnapshotPB")]
@@ -138,7 +157,7 @@ pub enum FolderEvent {
   #[event(input = "MoveNestedViewPayloadPB")]
   MoveNestedView = 32,
 
-  #[event(output = "RepeatedViewPB")]
+  #[event(output = "RepeatedFavoriteViewPB")]
   ReadFavorites = 33,
 
   #[event(input = "RepeatedViewIdPB")]
@@ -147,13 +166,58 @@ pub enum FolderEvent {
   #[event(input = "UpdateViewIconPayloadPB")]
   UpdateViewIcon = 35,
 
-  #[event(output = "RepeatedViewPB")]
+  #[event(input = "ReadRecentViewsPB", output = "RepeatedRecentViewPB")]
   ReadRecentViews = 36,
 
   // used for add or remove recent views, like history
   #[event(input = "UpdateRecentViewPayloadPB")]
   UpdateRecentViews = 37,
 
+  #[event(input = "GetWorkspaceViewPB", output = "RepeatedViewPB")]
+  ReadPrivateViews = 39,
+
+  /// Return a list of views of the current workspace.
+  /// Only the first level of child views are included.
+  #[event(output = "RepeatedViewPB")]
+  ReadCurrentWorkspaceViews = 40,
+
+  #[event(input = "UpdateViewVisibilityStatusPayloadPB")]
+  UpdateViewVisibilityStatus = 41,
+
+  /// Return the ancestors of the view
+  #[event(input = "ViewIdPB", output = "RepeatedViewPB")]
+  GetViewAncestors = 42,
+
+  #[event(input = "PublishViewParamsPB")]
+  PublishView = 43,
+
+  #[event(input = "ViewIdPB", output = "PublishInfoResponsePB")]
+  GetPublishInfo = 44,
+
+  #[event(output = "PublishNamespacePB")]
+  GetPublishNamespace = 45,
+
+  #[event(input = "SetPublishNamespacePayloadPB")]
+  SetPublishNamespace = 46,
+
+  #[event(input = "UnpublishViewsPayloadPB")]
+  UnpublishViews = 47,
+
+  #[event(input = "ImportZipPB")]
+  ImportZipFile = 48,
+
+  #[event(output = "RepeatedPublishInfoViewPB")]
+  ListPublishedViews = 49,
+
+  #[event(output = "PublishInfoResponsePB")]
+  GetDefaultPublishInfo = 50,
+
+  #[event(input = "ViewIdPB")]
+  SetDefaultPublishView = 51,
+
+  #[event(input = "SetPublishNamePB")]
+  SetPublishName = 52,
+
   #[event()]
-  ReloadWorkspace = 38,
+  RemoveDefaultPublishView = 53,
 }

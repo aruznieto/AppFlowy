@@ -1,9 +1,8 @@
 use collab::core::collab_state::SyncState;
 use collab_database::rows::RowId;
-use collab_database::user::DatabaseMeta;
 use collab_database::views::DatabaseLayout;
 
-use flowy_derive::ProtoBuf;
+use flowy_derive::{ProtoBuf, ProtoBuf_Enum};
 use flowy_error::{ErrorCode, FlowyError};
 
 use lib_infra::validator_fn::required_not_empty_str;
@@ -78,7 +77,7 @@ pub struct RepeatedDatabaseIdPB {
 #[derive(Clone, ProtoBuf, Default, Debug, Validate)]
 pub struct DatabaseViewIdPB {
   #[pb(index = 1)]
-  #[validate(custom = "required_not_empty_str")]
+  #[validate(custom(function = "required_not_empty_str"))]
   pub value: String,
 }
 
@@ -156,6 +155,7 @@ impl TryInto<MoveRowParams> for MoveRowPayloadPB {
     })
   }
 }
+
 #[derive(Debug, Clone, Default, ProtoBuf)]
 pub struct MoveGroupRowPayloadPB {
   #[pb(index = 1)]
@@ -203,23 +203,18 @@ impl TryInto<MoveGroupRowParams> for MoveGroupRowPayloadPB {
 }
 
 #[derive(Debug, Default, ProtoBuf)]
-pub struct DatabaseDescriptionPB {
+pub struct DatabaseMetaPB {
   #[pb(index = 1)]
   pub database_id: String,
-}
 
-impl From<DatabaseMeta> for DatabaseDescriptionPB {
-  fn from(data: DatabaseMeta) -> Self {
-    Self {
-      database_id: data.database_id,
-    }
-  }
+  #[pb(index = 2)]
+  pub inline_view_id: String,
 }
 
 #[derive(Debug, Default, ProtoBuf)]
 pub struct RepeatedDatabaseDescriptionPB {
   #[pb(index = 1)]
-  pub items: Vec<DatabaseDescriptionPB>,
+  pub items: Vec<DatabaseMetaPB>,
 }
 
 #[derive(Debug, Clone, Default, ProtoBuf)]
@@ -279,18 +274,27 @@ impl TryInto<DatabaseLayoutMeta> for DatabaseLayoutMetaPB {
 #[derive(Debug, Default, ProtoBuf)]
 pub struct DatabaseSyncStatePB {
   #[pb(index = 1)]
-  pub is_syncing: bool,
+  pub value: DatabaseSyncState,
+}
 
-  #[pb(index = 2)]
-  pub is_finish: bool,
+#[derive(Debug, Default, ProtoBuf_Enum, PartialEq, Eq, Clone, Copy)]
+pub enum DatabaseSyncState {
+  #[default]
+  InitSyncBegin = 0,
+  InitSyncEnd = 1,
+  Syncing = 2,
+  SyncFinished = 3,
 }
 
 impl From<SyncState> for DatabaseSyncStatePB {
   fn from(value: SyncState) -> Self {
-    Self {
-      is_syncing: value.is_syncing(),
-      is_finish: value.is_sync_finished(),
-    }
+    let value = match value {
+      SyncState::InitSyncBegin => DatabaseSyncState::InitSyncBegin,
+      SyncState::InitSyncEnd => DatabaseSyncState::InitSyncEnd,
+      SyncState::Syncing => DatabaseSyncState::Syncing,
+      SyncState::SyncFinished => DatabaseSyncState::SyncFinished,
+    };
+    Self { value }
   }
 }
 
@@ -319,4 +323,32 @@ pub struct DatabaseSnapshotPB {
 
   #[pb(index = 4)]
   pub data: Vec<u8>,
+}
+
+#[derive(Debug, Clone, Default, ProtoBuf)]
+pub struct RemoveCoverPayloadPB {
+  #[pb(index = 1)]
+  pub view_id: String,
+
+  #[pb(index = 2)]
+  pub row_id: String,
+}
+
+pub struct RemoveCoverParams {
+  pub view_id: String,
+  pub row_id: RowId,
+}
+
+impl TryInto<RemoveCoverParams> for RemoveCoverPayloadPB {
+  type Error = ErrorCode;
+
+  fn try_into(self) -> Result<RemoveCoverParams, Self::Error> {
+    let view_id = NotEmptyStr::parse(self.view_id).map_err(|_| ErrorCode::DatabaseViewIdIsEmpty)?;
+    let row_id = NotEmptyStr::parse(self.row_id).map_err(|_| ErrorCode::RowIdIsEmpty)?;
+
+    Ok(RemoveCoverParams {
+      view_id: view_id.0,
+      row_id: RowId::from(row_id.0),
+    })
+  }
 }

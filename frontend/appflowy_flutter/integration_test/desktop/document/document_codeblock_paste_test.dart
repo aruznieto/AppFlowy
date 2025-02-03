@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:appflowy/generated/locale_keys.g.dart';
+import 'package:appflowy/plugins/document/presentation/editor_plugins/copy_and_paste/clipboard_service.dart';
 import 'package:appflowy_editor/appflowy_editor.dart';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/services.dart';
@@ -12,22 +13,21 @@ import '../../shared/util.dart';
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
 
-  group('paste in codeblock', () {
+  group('paste in codeblock:', () {
     testWidgets('paste multiple lines in codeblock', (tester) async {
       await tester.initializeAppFlowy();
-      await tester.tapGoButton();
+      await tester.tapAnonymousSignInButton();
 
       // create a new document
-      await tester.createNewPageWithNameUnderParent();
+      await tester.createNewPageWithNameUnderParent(name: 'Test Document');
+      // focus on the editor
+      await tester.tapButton(find.byType(AppFlowyEditor));
 
       // mock the clipboard
       const lines = 3;
       final text = List.generate(lines, (index) => 'line $index').join('\n');
-      AppFlowyClipboard.mockSetData(
-        AppFlowyClipboardData(
-          text: text,
-        ),
-      );
+      AppFlowyClipboard.mockSetData(AppFlowyClipboardData(text: text));
+      ClipboardService.mockSetData(ClipboardServiceData(plainText: text));
 
       await insertCodeBlockInDocument(tester);
 
@@ -54,7 +54,9 @@ Future<void> insertCodeBlockInDocument(WidgetTester tester) async {
   // open the actions menu and insert the codeBlock
   await tester.editor.showSlashMenu();
   await tester.editor.tapSlashMenuItemWithName(
-    LocaleKeys.document_selectionMenu_codeBlock.tr(),
+    LocaleKeys.document_slashMenu_name_code.tr(),
+    offset: 150,
   );
+  // wait for the codeBlock to be inserted
   await tester.pumpAndSettle();
 }

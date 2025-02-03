@@ -1,10 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/widgets.dart';
 
-import 'package:appflowy/plugins/database/grid/presentation/widgets/header/type_option/date/date_time_format.dart';
+import 'package:appflowy/plugins/database/widgets/field/type_option_editor/date/date_time_format.dart';
 import 'package:appflowy/workspace/presentation/widgets/date_picker/utils/layout.dart';
 import 'package:appflowy_backend/protobuf/flowy-database2/date_entities.pbenum.dart';
-import 'package:appflowy_popover/appflowy_popover.dart';
 import 'package:flowy_infra_ui/flowy_infra_ui.dart';
 
 class DateTimeSetting extends StatefulWidget {
@@ -28,6 +27,12 @@ class DateTimeSetting extends StatefulWidget {
 class _DateTimeSettingState extends State<DateTimeSetting> {
   final timeSettingPopoverMutex = PopoverMutex();
   String? overlayIdentifier;
+
+  @override
+  void dispose() {
+    timeSettingPopoverMutex.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {

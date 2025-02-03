@@ -1,5 +1,7 @@
 import 'dart:io';
 
+import 'package:flutter/material.dart';
+
 import 'package:appflowy/generated/flowy_svgs.g.dart';
 import 'package:appflowy/generated/locale_keys.g.dart';
 import 'package:appflowy/plugins/database/application/cell/cell_controller.dart';
@@ -7,22 +9,24 @@ import 'package:appflowy/plugins/database/application/database_controller.dart';
 import 'package:appflowy/plugins/database/application/row/row_cache.dart';
 import 'package:appflowy/plugins/database/application/row/row_controller.dart';
 import 'package:appflowy/plugins/database/board/application/board_bloc.dart';
+import 'package:appflowy/plugins/database/board/group_ext.dart';
 import 'package:appflowy/plugins/database/grid/presentation/layout/sizes.dart';
+import 'package:appflowy/plugins/database/tab_bar/tab_bar_view.dart';
 import 'package:appflowy/plugins/database/widgets/cell/card_cell_builder.dart';
 import 'package:appflowy/plugins/database/widgets/cell/card_cell_skeleton/text_card_cell.dart';
 import 'package:appflowy/plugins/database/widgets/row/row_detail.dart';
 import 'package:appflowy_backend/protobuf/flowy-database2/protobuf.dart';
-import 'package:appflowy_popover/appflowy_popover.dart';
 import 'package:collection/collection.dart';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flowy_infra_ui/flowy_infra_ui.dart';
 import 'package:flowy_infra_ui/style_widget/hover.dart';
-import 'package:flowy_infra_ui/widget/flowy_tooltip.dart';
-import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 class HiddenGroupsColumn extends StatelessWidget {
-  const HiddenGroupsColumn({super.key, required this.margin});
+  const HiddenGroupsColumn({
+    super.key,
+    required this.margin,
+  });
 
   final EdgeInsets margin;
 
@@ -30,12 +34,17 @@ class HiddenGroupsColumn extends StatelessWidget {
   Widget build(BuildContext context) {
     final databaseController = context.read<BoardBloc>().databaseController;
     return BlocSelector<BoardBloc, BoardState, BoardLayoutSettingPB?>(
-      selector: (state) => state.layoutSettings,
+      selector: (state) => state.maybeMap(
+        orElse: () => null,
+        ready: (value) => value.layoutSettings,
+      ),
       builder: (context, layoutSettings) {
         if (layoutSettings == null) {
           return const SizedBox.shrink();
         }
         final isCollapsed = layoutSettings.collapseHiddenGroups;
+        final leftPadding = margin.left +
+            context.read<DatabasePluginWidgetBuilderSize>().horizontalPadding;
         return AnimatedSize(
           alignment: AlignmentDirectional.topStart,
           curve: Curves.easeOut,
@@ -44,38 +53,35 @@ class HiddenGroupsColumn extends StatelessWidget {
               ? SizedBox(
                   height: 50,
                   child: Padding(
-                    padding: const EdgeInsets.only(left: 40, right: 8),
+                    padding: const EdgeInsets.only(left: 80, right: 8),
                     child: Center(
                       child: _collapseExpandIcon(context, isCollapsed),
                     ),
                   ),
                 )
-              : SizedBox(
-                  width: 234,
+              : Container(
+                  width: 274,
+                  padding: EdgeInsets.only(
+                    left: leftPadding,
+                    right: margin.right + 4,
+                  ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       SizedBox(
                         height: 50,
-                        child: Padding(
-                          padding: EdgeInsets.only(
-                            left: 40 + margin.left,
-                            right: margin.right + 4,
-                          ),
-                          child: Row(
-                            children: [
-                              Expanded(
-                                child: FlowyText.medium(
-                                  LocaleKeys
-                                      .board_hiddenGroupSection_sectionTitle
-                                      .tr(),
-                                  overflow: TextOverflow.ellipsis,
-                                  color: Theme.of(context).hintColor,
-                                ),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: FlowyText.medium(
+                                LocaleKeys.board_hiddenGroupSection_sectionTitle
+                                    .tr(),
+                                overflow: TextOverflow.ellipsis,
+                                color: Theme.of(context).hintColor,
                               ),
-                              _collapseExpandIcon(context, isCollapsed),
-                            ],
-                          ),
+                            ),
+                            _collapseExpandIcon(context, isCollapsed),
+                          ],
                         ),
                       ),
                       Expanded(
@@ -125,43 +131,48 @@ class HiddenGroupList extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return BlocBuilder<BoardBloc, BoardState>(
-      builder: (_, state) => ReorderableListView.builder(
-        proxyDecorator: (child, index, animation) => Material(
-          color: Colors.transparent,
-          child: Stack(
-            children: [
-              child,
-              MouseRegion(
-                cursor: Platform.isWindows
-                    ? SystemMouseCursors.click
-                    : SystemMouseCursors.grabbing,
-                child: const SizedBox.expand(),
+      builder: (context, state) {
+        return state.maybeMap(
+          orElse: () => const SizedBox.shrink(),
+          ready: (state) => ReorderableListView.builder(
+            proxyDecorator: (child, index, animation) => Material(
+              color: Colors.transparent,
+              child: Stack(
+                children: [
+                  child,
+                  MouseRegion(
+                    cursor: Platform.isWindows
+                        ? SystemMouseCursors.click
+                        : SystemMouseCursors.grabbing,
+                    child: const SizedBox.expand(),
+                  ),
+                ],
               ),
-            ],
+            ),
+            buildDefaultDragHandles: false,
+            itemCount: state.hiddenGroups.length,
+            itemBuilder: (_, index) => Padding(
+              padding: const EdgeInsets.only(bottom: 4),
+              key: ValueKey("hiddenGroup${state.hiddenGroups[index].groupId}"),
+              child: HiddenGroupCard(
+                group: state.hiddenGroups[index],
+                index: index,
+                bloc: context.read<BoardBloc>(),
+              ),
+            ),
+            onReorder: (oldIndex, newIndex) {
+              if (oldIndex < newIndex) {
+                newIndex--;
+              }
+              final fromGroupId = state.hiddenGroups[oldIndex].groupId;
+              final toGroupId = state.hiddenGroups[newIndex].groupId;
+              context
+                  .read<BoardBloc>()
+                  .add(BoardEvent.reorderGroup(fromGroupId, toGroupId));
+            },
           ),
-        ),
-        buildDefaultDragHandles: false,
-        itemCount: state.hiddenGroups.length,
-        itemBuilder: (_, index) => Padding(
-          padding: const EdgeInsets.only(bottom: 4),
-          key: ValueKey("hiddenGroup${state.hiddenGroups[index].groupId}"),
-          child: HiddenGroupCard(
-            group: state.hiddenGroups[index],
-            index: index,
-            bloc: context.read<BoardBloc>(),
-          ),
-        ),
-        onReorder: (oldIndex, newIndex) {
-          if (oldIndex < newIndex) {
-            newIndex--;
-          }
-          final fromGroupId = state.hiddenGroups[oldIndex].groupId;
-          final toGroupId = state.hiddenGroups[newIndex].groupId;
-          context
-              .read<BoardBloc>()
-              .add(BoardEvent.reorderGroup(fromGroupId, toGroupId));
-        },
-      ),
+        );
+      },
     );
   }
 }
@@ -190,31 +201,27 @@ class _HiddenGroupCardState extends State<HiddenGroupCard> {
     final databaseController = widget.bloc.databaseController;
     final primaryField = databaseController.fieldController.fieldInfos
         .firstWhereOrNull((element) => element.isPrimary)!;
-
-    return Padding(
-      padding: const EdgeInsets.only(left: 26),
-      child: AppFlowyPopover(
-        controller: _popoverController,
-        direction: PopoverDirection.bottomWithCenterAligned,
-        triggerActions: PopoverTriggerFlags.none,
-        constraints: const BoxConstraints(maxWidth: 234, maxHeight: 300),
-        popupBuilder: (popoverContext) {
-          return BlocProvider.value(
-            value: context.read<BoardBloc>(),
-            child: HiddenGroupPopupItemList(
-              viewId: databaseController.viewId,
-              groupId: widget.group.groupId,
-              primaryFieldId: primaryField.id,
-              rowCache: databaseController.rowCache,
-            ),
-          );
-        },
-        child: HiddenGroupButtonContent(
-          popoverController: _popoverController,
-          groupId: widget.group.groupId,
-          index: widget.index,
-          bloc: widget.bloc,
-        ),
+    return AppFlowyPopover(
+      controller: _popoverController,
+      direction: PopoverDirection.bottomWithCenterAligned,
+      triggerActions: PopoverTriggerFlags.none,
+      constraints: const BoxConstraints(maxWidth: 234, maxHeight: 300),
+      popupBuilder: (popoverContext) {
+        return BlocProvider.value(
+          value: context.read<BoardBloc>(),
+          child: HiddenGroupPopupItemList(
+            viewId: databaseController.viewId,
+            groupId: widget.group.groupId,
+            primaryFieldId: primaryField.id,
+            rowCache: databaseController.rowCache,
+          ),
+        );
+      },
+      child: HiddenGroupButtonContent(
+        popoverController: _popoverController,
+        groupId: widget.group.groupId,
+        index: widget.index,
+        bloc: widget.bloc,
       ),
     );
   }
@@ -247,57 +254,72 @@ class HiddenGroupButtonContent extends StatelessWidget {
               value: bloc,
               child: BlocBuilder<BoardBloc, BoardState>(
                 builder: (context, state) {
-                  final group = state.hiddenGroups.firstWhereOrNull(
-                    (g) => g.groupId == groupId,
-                  );
-                  if (group == null) {
-                    return const SizedBox.shrink();
-                  }
+                  return state.maybeMap(
+                    orElse: () => const SizedBox.shrink(),
+                    ready: (state) {
+                      final group = state.hiddenGroups.firstWhereOrNull(
+                        (g) => g.groupId == groupId,
+                      );
+                      if (group == null) {
+                        return const SizedBox.shrink();
+                      }
 
-                  return SizedBox(
-                    height: 32,
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 4,
-                        vertical: 3,
-                      ),
-                      child: Row(
-                        children: [
-                          HiddenGroupCardActions(
-                            isVisible: isHovering,
-                            index: index,
+                      return SizedBox(
+                        height: 32,
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 4,
+                            vertical: 3,
                           ),
-                          const HSpace(4),
-                          FlowyText.medium(
-                            group.groupName,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                          const HSpace(6),
-                          Expanded(
-                            child: FlowyText.medium(
-                              group.rows.length.toString(),
-                              overflow: TextOverflow.ellipsis,
-                              color: Theme.of(context).hintColor,
-                            ),
-                          ),
-                          if (isHovering) ...[
-                            FlowyIconButton(
-                              width: 20,
-                              icon: FlowySvg(
-                                FlowySvgs.show_m,
-                                color: Theme.of(context).hintColor,
+                          child: Row(
+                            children: [
+                              HiddenGroupCardActions(
+                                isVisible: isHovering,
+                                index: index,
                               ),
-                              onPressed: () => context.read<BoardBloc>().add(
-                                    BoardEvent.toggleGroupVisibility(
-                                      group,
-                                      true,
+                              const HSpace(4),
+                              Expanded(
+                                child: Row(
+                                  children: [
+                                    Flexible(
+                                      child: FlowyText(
+                                        group.generateGroupName(
+                                          bloc.databaseController,
+                                        ),
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
                                     ),
+                                    const HSpace(6),
+                                    FlowyText(
+                                      group.rows.length.toString(),
+                                      overflow: TextOverflow.ellipsis,
+                                      color: Theme.of(context).hintColor,
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              if (isHovering) ...[
+                                const HSpace(6),
+                                FlowyIconButton(
+                                  width: 20,
+                                  icon: const FlowySvg(
+                                    FlowySvgs.show_m,
+                                    size: Size.square(16),
                                   ),
-                            ),
-                          ],
-                        ],
-                      ),
-                    ),
+                                  onPressed: () =>
+                                      context.read<BoardBloc>().add(
+                                            BoardEvent.setGroupVisibility(
+                                              group,
+                                              true,
+                                            ),
+                                          ),
+                                ),
+                              ],
+                            ],
+                          ),
+                        ),
+                      );
+                    },
                   );
                 },
               ),
@@ -343,11 +365,11 @@ class HiddenGroupCardActions extends StatelessWidget {
 
 class HiddenGroupPopupItemList extends StatelessWidget {
   const HiddenGroupPopupItemList({
+    super.key,
     required this.groupId,
     required this.viewId,
     required this.primaryFieldId,
     required this.rowCache,
-    super.key,
   });
 
   final String groupId;
@@ -359,65 +381,72 @@ class HiddenGroupPopupItemList extends StatelessWidget {
   Widget build(BuildContext context) {
     return BlocBuilder<BoardBloc, BoardState>(
       builder: (context, state) {
-        final group = state.hiddenGroups.firstWhereOrNull(
-          (g) => g.groupId == groupId,
-        );
-        if (group == null) {
-          return const SizedBox.shrink();
-        }
-        final cells = <Widget>[
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
-            child: FlowyText.medium(
-              group.groupName,
-              fontSize: 10,
-              color: Theme.of(context).hintColor,
-              overflow: TextOverflow.ellipsis,
-            ),
-          ),
-          ...group.rows.map(
-            (item) {
-              final rowController = RowController(
-                rowMeta: item,
-                viewId: viewId,
-                rowCache: rowCache,
-              );
-
-              final databaseController =
-                  context.read<BoardBloc>().databaseController;
-
-              return HiddenGroupPopupItem(
-                cellContext: rowCache.loadCells(item).firstWhere(
-                      (cellContext) => cellContext.fieldId == primaryFieldId,
-                    ),
-                rowController: rowController,
-                rowMeta: item,
-                cellBuilder: CardCellBuilder(
-                  databaseController: databaseController,
+        return state.maybeMap(
+          orElse: () => const SizedBox.shrink(),
+          ready: (state) {
+            final group = state.hiddenGroups.firstWhereOrNull(
+              (g) => g.groupId == groupId,
+            );
+            if (group == null) {
+              return const SizedBox.shrink();
+            }
+            final bloc = context.read<BoardBloc>();
+            final cells = <Widget>[
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                child: FlowyText(
+                  group.generateGroupName(bloc.databaseController),
+                  fontSize: 10,
+                  color: Theme.of(context).hintColor,
+                  overflow: TextOverflow.ellipsis,
                 ),
-                onPressed: () {
-                  FlowyOverlay.show(
-                    context: context,
-                    builder: (_) {
-                      return RowDetailPage(
-                        databaseController: databaseController,
-                        rowController: rowController,
+              ),
+              ...group.rows.map(
+                (item) {
+                  final rowController = RowController(
+                    rowMeta: item,
+                    viewId: viewId,
+                    rowCache: rowCache,
+                  );
+                  rowController.initialize();
+
+                  final databaseController =
+                      context.read<BoardBloc>().databaseController;
+
+                  return HiddenGroupPopupItem(
+                    cellContext: rowCache.loadCells(item).firstWhere(
+                          (cellContext) =>
+                              cellContext.fieldId == primaryFieldId,
+                        ),
+                    rowController: rowController,
+                    rowMeta: item,
+                    cellBuilder: CardCellBuilder(
+                      databaseController: databaseController,
+                    ),
+                    onPressed: () {
+                      FlowyOverlay.show(
+                        context: context,
+                        builder: (_) => RowDetailPage(
+                          databaseController: databaseController,
+                          rowController: rowController,
+                          userProfile: context.read<BoardBloc>().userProfile,
+                        ),
                       );
+                      PopoverContainer.of(context).close();
                     },
                   );
-                  PopoverContainer.of(context).close();
                 },
-              );
-            },
-          ),
-        ];
+              ),
+            ];
 
-        return ListView.separated(
-          itemBuilder: (context, index) => cells[index],
-          itemCount: cells.length,
-          separatorBuilder: (context, index) =>
-              VSpace(GridSize.typeOptionSeparatorHeight),
-          shrinkWrap: true,
+            return ListView.separated(
+              itemBuilder: (context, index) => cells[index],
+              itemCount: cells.length,
+              separatorBuilder: (context, index) =>
+                  VSpace(GridSize.typeOptionSeparatorHeight),
+              shrinkWrap: true,
+            );
+          },
         );
       },
     );
@@ -449,7 +478,7 @@ class HiddenGroupPopupItem extends StatelessWidget {
         text: cellBuilder.build(
           cellContext: cellContext,
           styleMap: {FieldType.RichText: _titleCellStyle(context)},
-          hasNotes: !rowMeta.isDocumentEmpty,
+          hasNotes: false,
         ),
         onTap: onPressed,
       ),

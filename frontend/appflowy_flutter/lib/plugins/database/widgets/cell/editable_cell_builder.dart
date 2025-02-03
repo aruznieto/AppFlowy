@@ -3,6 +3,8 @@ import 'package:flutter/widgets.dart';
 
 import 'package:appflowy/plugins/database/application/cell/cell_controller.dart';
 import 'package:appflowy/plugins/database/application/database_controller.dart';
+import 'package:appflowy/plugins/database/widgets/cell/editable_cell_skeleton/media.dart';
+import 'package:appflowy/plugins/database/widgets/cell/editable_cell_skeleton/translate.dart';
 import 'package:appflowy_backend/protobuf/flowy-database2/protobuf.dart';
 
 import '../row/accessory/cell_accessory.dart';
@@ -15,7 +17,9 @@ import 'editable_cell_skeleton/date.dart';
 import 'editable_cell_skeleton/number.dart';
 import 'editable_cell_skeleton/relation.dart';
 import 'editable_cell_skeleton/select_option.dart';
+import 'editable_cell_skeleton/summary.dart';
 import 'editable_cell_skeleton/text.dart';
+import 'editable_cell_skeleton/time.dart';
 import 'editable_cell_skeleton/timestamp.dart';
 import 'editable_cell_skeleton/url.dart';
 
@@ -113,6 +117,31 @@ class EditableCellBuilder {
           skin: IEditableRelationCellSkin.fromStyle(style),
           key: key,
         ),
+      FieldType.Summary => EditableSummaryCell(
+          databaseController: databaseController,
+          cellContext: cellContext,
+          skin: IEditableSummaryCellSkin.fromStyle(style),
+          key: key,
+        ),
+      FieldType.Time => EditableTimeCell(
+          databaseController: databaseController,
+          cellContext: cellContext,
+          skin: IEditableTimeCellSkin.fromStyle(style),
+          key: key,
+        ),
+      FieldType.Translate => EditableTranslateCell(
+          databaseController: databaseController,
+          cellContext: cellContext,
+          skin: IEditableTranslateCellSkin.fromStyle(style),
+          key: key,
+        ),
+      FieldType.Media => EditableMediaCell(
+          databaseController: databaseController,
+          cellContext: cellContext,
+          skin: IEditableMediaCellSkin.fromStyle(style),
+          style: style,
+          key: key,
+        ),
       _ => throw UnimplementedError(),
     };
   }
@@ -199,6 +228,19 @@ class EditableCellBuilder {
           skin: skinMap.relationSkin!,
           key: key,
         ),
+      FieldType.Time => EditableTimeCell(
+          databaseController: databaseController,
+          cellContext: cellContext,
+          skin: skinMap.timeSkin!,
+          key: key,
+        ),
+      FieldType.Media => EditableMediaCell(
+          databaseController: databaseController,
+          cellContext: cellContext,
+          skin: skinMap.mediaSkin!,
+          style: EditableCellStyle.desktopGrid,
+          key: key,
+        ),
       _ => throw UnimplementedError(),
     };
   }
@@ -247,6 +289,7 @@ abstract class GridCellState<T extends EditableCellWidget> extends State<T> {
   @override
   void didUpdateWidget(covariant T oldWidget) {
     if (oldWidget != this) {
+      oldWidget.requestFocus.removeListener(onRequestFocus);
       widget.requestFocus.addListener(onRequestFocus);
     }
     super.didUpdateWidget(oldWidget);
@@ -341,6 +384,12 @@ class SingleListenerFocusNode extends FocusNode {
       removeListener(_listener!);
     }
   }
+
+  @override
+  void dispose() {
+    removeAllListener();
+    super.dispose();
+  }
 }
 
 class EditableCellSkinMap {
@@ -354,6 +403,8 @@ class EditableCellSkinMap {
     this.textSkin,
     this.urlSkin,
     this.relationSkin,
+    this.timeSkin,
+    this.mediaSkin,
   });
 
   final IEditableCheckboxCellSkin? checkboxSkin;
@@ -365,6 +416,8 @@ class EditableCellSkinMap {
   final IEditableTextCellSkin? textSkin;
   final IEditableURLCellSkin? urlSkin;
   final IEditableRelationCellSkin? relationSkin;
+  final IEditableTimeCellSkin? timeSkin;
+  final IEditableMediaCellSkin? mediaSkin;
 
   bool has(FieldType fieldType) {
     return switch (fieldType) {
@@ -380,6 +433,8 @@ class EditableCellSkinMap {
       FieldType.Number => numberSkin != null,
       FieldType.RichText => textSkin != null,
       FieldType.URL => urlSkin != null,
+      FieldType.Time => timeSkin != null,
+      FieldType.Media => mediaSkin != null,
       _ => throw UnimplementedError(),
     };
   }

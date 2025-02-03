@@ -10,6 +10,8 @@ import 'package:appflowy/workspace/application/settings/appearance/base_appearan
 import 'package:appflowy_backend/log.dart';
 import 'package:appflowy_backend/protobuf/flowy-user/date_time.pbenum.dart';
 import 'package:appflowy_backend/protobuf/flowy-user/user_setting.pb.dart';
+import 'package:appflowy_editor/appflowy_editor.dart'
+    show AppFlowyEditorLocalizations;
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flowy_infra/theme.dart';
 import 'package:flutter/material.dart';
@@ -39,7 +41,6 @@ class AppearanceSettingsCubit extends Cubit<AppearanceSettingsState> {
             appTheme,
             appearanceSettings.themeMode,
             appearanceSettings.font,
-            appearanceSettings.monospaceFont,
             appearanceSettings.layoutDirection,
             appearanceSettings.textDirection,
             appearanceSettings.enableRtlToolbarItems,
@@ -128,9 +129,8 @@ class AppearanceSettingsCubit extends Cubit<AppearanceSettingsState> {
     emit(state.copyWith(layoutDirection: layoutDirection));
   }
 
-  void setTextDirection(AppFlowyTextDirection? textDirection) {
-    _appearanceSettings.textDirection =
-        textDirection?.toTextDirectionPB() ?? TextDirectionPB.FALLBACK;
+  void setTextDirection(AppFlowyTextDirection textDirection) {
+    _appearanceSettings.textDirection = textDirection.toTextDirectionPB();
     _saveAppearanceSettings();
     emit(state.copyWith(textDirection: textDirection));
   }
@@ -153,28 +153,28 @@ class AppearanceSettingsCubit extends Cubit<AppearanceSettingsState> {
   void resetFontFamily() =>
       setFontFamily(DefaultAppearanceSettings.kDefaultFontFamily);
 
-  /// Update document cursor color in the apperance settings and emit an updated state.
+  /// Update document cursor color in the appearance settings and emit an updated state.
   void setDocumentCursorColor(Color color) {
     _appearanceSettings.documentSetting.cursorColor = color.toHexString();
     _saveAppearanceSettings();
     emit(state.copyWith(documentCursorColor: color));
   }
 
-  /// Reset document cursor color in the apperance settings
+  /// Reset document cursor color in the appearance settings
   void resetDocumentCursorColor() {
     _appearanceSettings.documentSetting.cursorColor = '';
     _saveAppearanceSettings();
     emit(state.copyWith(documentCursorColor: null));
   }
 
-  /// Update document selection color in the apperance settings and emit an updated state.
+  /// Update document selection color in the appearance settings and emit an updated state.
   void setDocumentSelectionColor(Color color) {
     _appearanceSettings.documentSetting.selectionColor = color.toHexString();
     _saveAppearanceSettings();
     emit(state.copyWith(documentSelectionColor: color));
   }
 
-  /// Reset document selection color in the apperance settings
+  /// Reset document selection color in the appearance settings
   void resetDocumentSelectionColor() {
     _appearanceSettings.documentSetting.selectionColor = '';
     _saveAppearanceSettings();
@@ -192,6 +192,9 @@ class AppearanceSettingsCubit extends Cubit<AppearanceSettingsState> {
     context.setLocale(newLocale).catchError((e) {
       Log.warn('Catch error in setLocale: $e}');
     });
+
+    // Sync the app's locale with the editor (initialization and update)
+    AppFlowyEditorLocalizations.load(newLocale);
 
     if (state.locale != newLocale) {
       _appearanceSettings.locale.languageCode = newLocale.languageCode;
@@ -332,7 +335,7 @@ enum AppFlowyTextDirection {
   rtl,
   auto;
 
-  static AppFlowyTextDirection? fromTextDirectionPB(
+  static AppFlowyTextDirection fromTextDirectionPB(
     TextDirectionPB? textDirectionPB,
   ) {
     switch (textDirectionPB) {
@@ -343,7 +346,7 @@ enum AppFlowyTextDirection {
       case TextDirectionPB.AUTO:
         return AppFlowyTextDirection.auto;
       default:
-        return null;
+        return AppFlowyTextDirection.ltr;
     }
   }
 
@@ -369,9 +372,8 @@ class AppearanceSettingsState with _$AppearanceSettingsState {
     required AppTheme appTheme,
     required ThemeMode themeMode,
     required String font,
-    required String monospaceFont,
     required LayoutDirection layoutDirection,
-    required AppFlowyTextDirection? textDirection,
+    required AppFlowyTextDirection textDirection,
     required bool enableRtlToolbarItems,
     required Locale locale,
     required bool isMenuCollapsed,
@@ -388,7 +390,6 @@ class AppearanceSettingsState with _$AppearanceSettingsState {
     AppTheme appTheme,
     ThemeModePB themeModePB,
     String font,
-    String monospaceFont,
     LayoutDirectionPB layoutDirectionPB,
     TextDirectionPB? textDirectionPB,
     bool enableRtlToolbarItems,
@@ -405,7 +406,6 @@ class AppearanceSettingsState with _$AppearanceSettingsState {
     return AppearanceSettingsState(
       appTheme: appTheme,
       font: font,
-      monospaceFont: monospaceFont,
       layoutDirection: LayoutDirection.fromLayoutDirectionPB(layoutDirectionPB),
       textDirection: AppFlowyTextDirection.fromTextDirectionPB(textDirectionPB),
       enableRtlToolbarItems: enableRtlToolbarItems,
@@ -423,6 +423,7 @@ class AppearanceSettingsState with _$AppearanceSettingsState {
   }
 
   ThemeData get lightTheme => _getThemeData(Brightness.light);
+
   ThemeData get darkTheme => _getThemeData(Brightness.dark);
 
   ThemeData _getThemeData(Brightness brightness) {
@@ -430,7 +431,7 @@ class AppearanceSettingsState with _$AppearanceSettingsState {
       appTheme,
       brightness,
       font,
-      monospaceFont,
+      builtInCodeFontFamily,
     );
   }
 }

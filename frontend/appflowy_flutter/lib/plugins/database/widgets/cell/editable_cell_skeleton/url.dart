@@ -1,9 +1,9 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:appflowy/generated/flowy_svgs.g.dart';
 import 'package:appflowy/generated/locale_keys.g.dart';
 import 'package:appflowy/mobile/presentation/widgets/flowy_mobile_quick_action_button.dart';
-import 'package:appflowy/core/helpers/url_launcher.dart';
 import 'package:appflowy/plugins/database/application/cell/cell_controller.dart';
 import 'package:appflowy/plugins/database/application/cell/cell_controller_builder.dart';
 import 'package:appflowy/plugins/database/application/database_controller.dart';
@@ -18,14 +18,12 @@ import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:fluttertoast/fluttertoast.dart';
 import 'package:go_router/go_router.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../desktop_grid/desktop_grid_url_cell.dart';
 import '../desktop_row_detail/desktop_row_detail_url_cell.dart';
 import '../mobile_grid/mobile_grid_url_cell.dart';
 import '../mobile_row_detail/mobile_row_detail_url_cell.dart';
-
-const regexUrl =
-    r"[(http(s)?):\/\/(www\.)?a-zA-Z0-9@:._\+-~#=]{2,256}\.[a-z]{2,6}\b([-a-zA-Z0-9@:_\+.~#?&\/\/=]*)";
 
 abstract class IEditableURLCellSkin {
   const IEditableURLCellSkin();
@@ -87,7 +85,7 @@ class _GridURLCellState extends GridEditableTextCell<EditableURLCell> {
       widget.databaseController,
       widget.cellContext,
     ).as(),
-  )..add(const URLCellEvent.initial());
+  );
 
   @override
   SingleListenerFocusNode focusNode = SingleListenerFocusNode();
@@ -114,8 +112,10 @@ class _GridURLCellState extends GridEditableTextCell<EditableURLCell> {
       child: BlocListener<URLCellBloc, URLCellState>(
         listenWhen: (previous, current) => previous.content != current.content,
         listener: (context, state) {
-          _textEditingController.value =
-              _textEditingController.value.copyWith(text: state.content);
+          if (!focusNode.hasFocus) {
+            _textEditingController.value =
+                _textEditingController.value.copyWith(text: state.content);
+          }
           widget._cellDataNotifier.value = state.content;
         },
         child: widget.skin.build(
@@ -134,8 +134,8 @@ class _GridURLCellState extends GridEditableTextCell<EditableURLCell> {
   Future<void> focusChanged() async {
     if (mounted &&
         !cellBloc.isClosed &&
-        cellBloc.state.content != _textEditingController.text.trim()) {
-      cellBloc.add(URLCellEvent.updateURL(_textEditingController.text.trim()));
+        cellBloc.state.content != _textEditingController.text) {
+      cellBloc.add(URLCellEvent.updateURL(_textEditingController.text));
     }
     return super.focusChanged();
   }
@@ -169,6 +169,9 @@ class MobileURLEditor extends StatelessWidget {
             textStyle: Theme.of(context).textTheme.bodyMedium,
             keyboardType: TextInputType.url,
             hintTextConstraints: const BoxConstraints(maxHeight: 52),
+            error: context.watch<URLCellBloc>().state.isValid
+                ? null
+                : const SizedBox.shrink(),
             onChanged: (_) {
               if (textEditingController.value.composing.isCollapsed) {
                 context
@@ -190,7 +193,7 @@ class MobileURLEditor extends StatelessWidget {
           icon: FlowySvgs.url_s,
           text: LocaleKeys.grid_url_launch.tr(),
         ),
-        const Divider(height: 8.5, thickness: 0.5),
+        const MobileQuickActionDivider(),
         MobileQuickActionButton(
           enable: context.watch<URLCellBloc>().state.content.isNotEmpty,
           onTap: () {
@@ -206,29 +209,26 @@ class MobileURLEditor extends StatelessWidget {
           icon: FlowySvgs.copy_s,
           text: LocaleKeys.grid_url_copy.tr(),
         ),
-        const Divider(height: 8.5, thickness: 0.5),
       ],
     );
   }
 }
 
-void openUrlCellLink(String content) {
-  if (RegExp(regexUrl).hasMatch(content)) {
-    const linkPrefix = [
-      'http://',
-      'https://',
-      'file://',
-      'ftp://',
-      'ftps://',
-      'mailto:',
-    ];
-    final shouldAddScheme =
-        !linkPrefix.any((pattern) => content.startsWith(pattern));
-    final url = shouldAddScheme ? 'https://$content' : content;
-    afLaunchUrlString(url);
-  } else {
-    afLaunchUrlString(
+void openUrlCellLink(String content) async {
+  late Uri uri;
+
+  try {
+    uri = Uri.parse(content);
+    // `Uri` identifies `localhost` as a scheme
+    if (!uri.hasScheme || uri.scheme == 'localhost') {
+      uri = Uri.parse("http://$content");
+      await InternetAddress.lookup(uri.host);
+    }
+  } catch (_) {
+    uri = Uri.parse(
       "https://www.google.com/search?q=${Uri.encodeComponent(content)}",
     );
+  } finally {
+    await launchUrl(uri);
   }
 }

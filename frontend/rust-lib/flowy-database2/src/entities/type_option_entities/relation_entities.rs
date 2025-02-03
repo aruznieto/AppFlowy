@@ -1,7 +1,8 @@
+use collab_database::fields::relation_type_option::RelationTypeOption;
+use collab_database::template::relation_parse::RelationCellData;
 use flowy_derive::ProtoBuf;
 
 use crate::entities::CellIdPB;
-use crate::services::field::{RelationCellData, RelationTypeOption};
 
 #[derive(Debug, Clone, Default, ProtoBuf)]
 pub struct RelationCellDataPB {
@@ -78,7 +79,7 @@ pub struct RepeatedRelatedRowDataPB {
 }
 
 #[derive(Debug, Default, Clone, ProtoBuf)]
-pub struct RepeatedRowIdPB {
+pub struct GetRelatedRowDataPB {
   #[pb(index = 1)]
   pub database_id: String,
 

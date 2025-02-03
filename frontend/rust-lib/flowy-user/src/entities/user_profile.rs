@@ -1,14 +1,15 @@
-use std::convert::TryInto;
-use validator::Validate;
-
 use flowy_derive::{ProtoBuf, ProtoBuf_Enum};
 use flowy_user_pub::entities::*;
+use lib_infra::validator_fn::required_not_empty_str;
+use std::convert::TryInto;
+use validator::Validate;
 
 use crate::entities::parser::{UserEmail, UserIcon, UserName, UserOpenaiKey, UserPassword};
 use crate::entities::AuthenticatorPB;
 use crate::errors::ErrorCode;
 
 use super::parser::UserStabilityAIKey;
+use super::AFRolePB;
 
 #[derive(Default, ProtoBuf)]
 pub struct UserTokenPB {
@@ -52,10 +53,10 @@ pub struct UserProfilePB {
   pub encryption_type: EncryptionTypePB,
 
   #[pb(index = 10)]
-  pub workspace_id: String,
+  pub stability_ai_key: String,
 
   #[pb(index = 11)]
-  pub stability_ai_key: String,
+  pub ai_model: String,
 }
 
 #[derive(ProtoBuf_Enum, Eq, PartialEq, Debug, Clone)]
@@ -76,6 +77,10 @@ impl From<UserProfile> for UserProfilePB {
       EncryptionType::NoEncryption => ("".to_string(), EncryptionTypePB::NoEncryption),
       EncryptionType::SelfEncryption(sign) => (sign, EncryptionTypePB::Symmetric),
     };
+    let mut ai_model = user_profile.ai_model;
+    if ai_model.is_empty() {
+      ai_model = "Default".to_string();
+    }
     Self {
       id: user_profile.uid,
       email: user_profile.email,
@@ -86,8 +91,8 @@ impl From<UserProfile> for UserProfilePB {
       authenticator: user_profile.authenticator.into(),
       encryption_sign,
       encryption_type: encryption_ty,
-      workspace_id: user_profile.workspace_id,
       stability_ai_key: user_profile.stability_ai_key,
+      ai_model,
     }
   }
 }
@@ -199,6 +204,7 @@ impl TryInto<UpdateUserProfileParams> for UpdateUserProfilePayloadPB {
       encryption_sign: None,
       token: None,
       stability_ai_key,
+      ai_model: None,
     })
   }
 }
@@ -220,7 +226,7 @@ impl From<Vec<UserWorkspace>> for RepeatedUserWorkspacePB {
 #[derive(ProtoBuf, Default, Debug, Clone, Validate)]
 pub struct UserWorkspacePB {
   #[pb(index = 1)]
-  #[validate(custom = "lib_infra::validator_fn::required_not_empty_str")]
+  #[validate(custom(function = "required_not_empty_str"))]
   pub workspace_id: String,
 
   #[pb(index = 2)]
@@ -231,6 +237,12 @@ pub struct UserWorkspacePB {
 
   #[pb(index = 4)]
   pub icon: String,
+
+  #[pb(index = 5)]
+  pub member_count: i64,
+
+  #[pb(index = 6, one_of)]
+  pub role: Option<AFRolePB>,
 }
 
 impl From<UserWorkspace> for UserWorkspacePB {
@@ -240,6 +252,8 @@ impl From<UserWorkspace> for UserWorkspacePB {
       name: value.name,
       created_at_timestamp: value.created_at.timestamp(),
       icon: value.icon,
+      member_count: value.member_count,
+      role: value.role.map(AFRolePB::from),
     }
   }
 }

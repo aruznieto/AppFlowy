@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:ui';
 
 import 'package:appflowy/plugins/database/application/cell/cell_controller_builder.dart';
 import 'package:appflowy/plugins/database/application/field/field_info.dart';
@@ -6,22 +7,27 @@ import 'package:appflowy_backend/protobuf/flowy-database2/date_entities.pb.dart'
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:freezed_annotation/freezed_annotation.dart';
 
+import 'date_cell_editor_bloc.dart';
+
 part 'date_cell_bloc.freezed.dart';
 
 class DateCellBloc extends Bloc<DateCellEvent, DateCellState> {
   DateCellBloc({required this.cellController})
       : super(DateCellState.initial(cellController)) {
     _dispatch();
+    _startListening();
   }
 
   final DateCellController cellController;
-  void Function()? _onCellChangedFn;
+  VoidCallback? _onCellChangedFn;
 
   @override
   Future<void> close() async {
     if (_onCellChangedFn != null) {
-      cellController.removeListener(_onCellChangedFn!);
-      _onCellChangedFn = null;
+      cellController.removeListener(
+        onCellChanged: _onCellChangedFn!,
+        onFieldChanged: _onFieldChangedListener,
+      );
     }
     await cellController.dispose();
     return super.close();
@@ -31,12 +37,18 @@ class DateCellBloc extends Bloc<DateCellEvent, DateCellState> {
     on<DateCellEvent>(
       (event, emit) async {
         event.when(
-          initial: () => _startListening(),
           didReceiveCellUpdate: (DateCellDataPB? cellData) {
+            final dateCellData = DateCellData.fromPB(cellData);
             emit(
               state.copyWith(
-                data: cellData,
-                dateStr: _dateStrFromCellData(cellData),
+                cellData: dateCellData,
+              ),
+            );
+          },
+          didUpdateField: (fieldInfo) {
+            emit(
+              state.copyWith(
+                fieldInfo: fieldInfo,
               ),
             );
           },
@@ -52,55 +64,38 @@ class DateCellBloc extends Bloc<DateCellEvent, DateCellState> {
           add(DateCellEvent.didReceiveCellUpdate(data));
         }
       },
+      onFieldChanged: _onFieldChangedListener,
     );
+  }
+
+  void _onFieldChangedListener(FieldInfo fieldInfo) {
+    if (!isClosed) {
+      add(DateCellEvent.didUpdateField(fieldInfo));
+    }
   }
 }
 
 @freezed
 class DateCellEvent with _$DateCellEvent {
-  const factory DateCellEvent.initial() = _InitialCell;
   const factory DateCellEvent.didReceiveCellUpdate(DateCellDataPB? data) =
       _DidReceiveCellUpdate;
+  const factory DateCellEvent.didUpdateField(FieldInfo fieldInfo) =
+      _DidUpdateField;
 }
 
 @freezed
 class DateCellState with _$DateCellState {
   const factory DateCellState({
-    required DateCellDataPB? data,
-    required String dateStr,
     required FieldInfo fieldInfo,
+    required DateCellData cellData,
   }) = _DateCellState;
 
-  factory DateCellState.initial(DateCellController context) {
-    final cellData = context.getCellData();
+  factory DateCellState.initial(DateCellController cellController) {
+    final cellData = DateCellData.fromPB(cellController.getCellData());
 
     return DateCellState(
-      fieldInfo: context.fieldInfo,
-      data: cellData,
-      dateStr: _dateStrFromCellData(cellData),
+      fieldInfo: cellController.fieldInfo,
+      cellData: cellData,
     );
   }
-}
-
-String _dateStrFromCellData(DateCellDataPB? cellData) {
-  if (cellData == null || !cellData.hasTimestamp()) {
-    return "";
-  }
-
-  String dateStr = "";
-  if (cellData.isRange) {
-    if (cellData.includeTime) {
-      dateStr =
-          "${cellData.date} ${cellData.time} → ${cellData.endDate} ${cellData.endTime}";
-    } else {
-      dateStr = "${cellData.date} → ${cellData.endDate}";
-    }
-  } else {
-    if (cellData.includeTime) {
-      dateStr = "${cellData.date} ${cellData.time}";
-    } else {
-      dateStr = cellData.date;
-    }
-  }
-  return dateStr.trim();
 }

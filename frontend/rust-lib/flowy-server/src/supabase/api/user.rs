@@ -5,23 +5,23 @@ use std::pin::Pin;
 use std::sync::{Arc, Weak};
 use std::time::Duration;
 
-use anyhow::{anyhow, Error};
-use collab::core::collab::{CollabDocState, MutexCollab};
+use anyhow::Error;
+use arc_swap::ArcSwapOption;
 use collab::core::origin::CollabOrigin;
+use collab::preclude::Collab;
 use collab_entity::{CollabObject, CollabType};
-use parking_lot::RwLock;
 use serde_json::Value;
 use tokio::sync::oneshot::channel;
 use tokio_retry::strategy::FixedInterval;
 use tokio_retry::{Action, RetryIf};
 use uuid::Uuid;
 
-use flowy_error::FlowyError;
+use flowy_error::{internal_error, FlowyError};
 use flowy_folder_pub::cloud::{Folder, FolderData, Workspace};
 use flowy_user_pub::cloud::*;
 use flowy_user_pub::entities::*;
 use flowy_user_pub::DEFAULT_USER_NAME;
-use lib_dispatch::prelude::af_spawn;
+
 use lib_infra::box_any::BoxAny;
 use lib_infra::future::FutureResult;
 
@@ -43,7 +43,7 @@ use crate::AppFlowyEncryption;
 pub struct SupabaseUserServiceImpl<T> {
   server: T,
   realtime_event_handlers: Vec<Box<dyn RealtimeEventHandler>>,
-  user_update_rx: RwLock<Option<UserUpdateReceiver>>,
+  user_update_rx: ArcSwapOption<UserUpdateReceiver>,
 }
 
 impl<T> SupabaseUserServiceImpl<T> {
@@ -55,7 +55,7 @@ impl<T> SupabaseUserServiceImpl<T> {
     Self {
       server,
       realtime_event_handlers,
-      user_update_rx: RwLock::new(user_update_rx),
+      user_update_rx: ArcSwapOption::from(user_update_rx.map(Arc::new)),
     }
   }
 }
@@ -187,6 +187,18 @@ where
     })
   }
 
+  fn sign_in_with_magic_link(
+    &self,
+    _email: &str,
+    _redirect_to: &str,
+  ) -> FutureResult<(), FlowyError> {
+    FutureResult::new(async {
+      Err(
+        FlowyError::not_support().with_context("Can't sign in with magic link when using supabase"),
+      )
+    })
+  }
+
   fn generate_oauth_url_with_provider(&self, _provider: &str) -> FutureResult<String, FlowyError> {
     FutureResult::new(async {
       Err(FlowyError::internal().with_context("Can't generate oauth url when using supabase"))
@@ -229,6 +241,7 @@ where
           authenticator: Authenticator::Supabase,
           encryption_type: EncryptionType::from_sign(&response.encryption_sign),
           updated_at: response.updated_at.timestamp(),
+          ai_model: "".to_string(),
         }),
       }
     })
@@ -248,22 +261,31 @@ where
       Ok(user_workspaces)
     })
   }
-  fn get_user_awareness_doc_state(&self, uid: i64) -> FutureResult<CollabDocState, Error> {
+
+  fn get_user_awareness_doc_state(
+    &self,
+    _uid: i64,
+    _workspace_id: &str,
+    object_id: &str,
+  ) -> FutureResult<Vec<u8>, FlowyError> {
     let try_get_postgrest = self.server.try_get_weak_postgrest();
-    let awareness_id = uid.to_string();
     let (tx, rx) = channel();
-    af_spawn(async move {
+    let object_id = object_id.to_string();
+    tokio::spawn(async move {
       tx.send(
         async move {
           let postgrest = try_get_postgrest?;
           let action =
-            FetchObjectUpdateAction::new(awareness_id, CollabType::UserAwareness, postgrest);
+            FetchObjectUpdateAction::new(object_id, CollabType::UserAwareness, postgrest);
           action.run_with_fix_interval(3, 3).await
         }
         .await,
       )
     });
-    FutureResult::new(async { rx.await? })
+    FutureResult::new(async {
+      let doc_state = rx.await.map_err(internal_error)?;
+      doc_state.map_err(internal_error)
+    })
   }
 
   fn receive_realtime_event(&self, json: Value) {
@@ -283,14 +305,15 @@ where
   }
 
   fn subscribe_user_update(&self) -> Option<UserUpdateReceiver> {
-    self.user_update_rx.write().take()
+    let rx = self.user_update_rx.swap(None)?;
+    Arc::into_inner(rx)
   }
 
-  fn reset_workspace(&self, collab_object: CollabObject) -> FutureResult<(), Error> {
+  fn reset_workspace(&self, collab_object: CollabObject) -> FutureResult<(), FlowyError> {
     let try_get_postgrest = self.server.try_get_weak_postgrest();
     let (tx, rx) = channel();
     let init_update = default_workspace_doc_state(&collab_object);
-    af_spawn(async move {
+    tokio::spawn(async move {
       tx.send(
         async move {
           let postgrest = try_get_postgrest?
@@ -324,12 +347,11 @@ where
     &self,
     collab_object: &CollabObject,
     data: Vec<u8>,
-    _override_if_exist: bool,
   ) -> FutureResult<(), FlowyError> {
     let try_get_postgrest = self.server.try_get_weak_postgrest();
     let cloned_collab_object = collab_object.clone();
     let (tx, rx) = channel();
-    af_spawn(async move {
+    tokio::spawn(async move {
       tx.send(
         async move {
           CreateCollabAction::new(cloned_collab_object, try_get_postgrest?, data)
@@ -347,11 +369,12 @@ where
     &self,
     _workspace_id: &str,
     _objects: Vec<UserCollabParams>,
-  ) -> FutureResult<(), Error> {
+  ) -> FutureResult<(), FlowyError> {
     FutureResult::new(async {
-      Err(anyhow!(
-        "supabase server doesn't support batch create collab"
-      ))
+      Err(
+        FlowyError::local_version_not_support()
+          .with_context("supabase server doesn't support batch create collab"),
+      )
     })
   }
 
@@ -624,7 +647,7 @@ impl RealtimeEventHandler for RealtimeCollabUpdateHandler {
       serde_json::from_value::<RealtimeCollabUpdateEvent>(event.new.clone())
     {
       if let Some(sender_by_oid) = self.sender_by_oid.upgrade() {
-        if let Some(sender) = sender_by_oid.read().get(collab_update.oid.as_str()) {
+        if let Some(sender) = sender_by_oid.get(collab_update.oid.as_str()) {
           tracing::trace!(
             "current device: {}, event device: {}",
             self.device_id,
@@ -665,14 +688,16 @@ impl RealtimeEventHandler for RealtimeCollabUpdateHandler {
 
 fn default_workspace_doc_state(collab_object: &CollabObject) -> Vec<u8> {
   let workspace_id = collab_object.object_id.clone();
-  let collab = Arc::new(MutexCollab::new(
-    CollabOrigin::Empty,
-    &collab_object.object_id,
-    vec![],
-  ));
+  let collab =
+    Collab::new_with_origin(CollabOrigin::Empty, &collab_object.object_id, vec![], false);
   let workspace = Workspace::new(workspace_id, "My workspace".to_string(), collab_object.uid);
-  let folder = Folder::create(collab_object.uid, collab, None, FolderData::new(workspace));
-  folder.encode_collab_v1().doc_state.to_vec()
+  let folder = Folder::open_with(
+    collab_object.uid,
+    collab,
+    None,
+    Some(FolderData::new(workspace)),
+  );
+  folder.encode_collab().unwrap().doc_state.to_vec()
 }
 
 fn oauth_params_from_box_any(any: BoxAny) -> Result<SupabaseOAuthParams, Error> {

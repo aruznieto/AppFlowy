@@ -10,7 +10,7 @@ async fn undo_redo_test() {
   let test = DocumentTest::new();
 
   let doc_id: String = gen_document_id();
-  let data = default_document_data();
+  let data = default_document_data(&doc_id);
 
   // create a document
   _ = test
@@ -22,8 +22,9 @@ async fn undo_redo_test() {
     .await;
 
   // open a document
-  let document = test.get_document(&doc_id).await.unwrap();
-  let document = document.lock();
+  test.open_document(&doc_id).await.unwrap();
+  let document = test.editable_document(&doc_id).await.unwrap();
+  let mut document = document.write().await;
   let page_block = document.get_block(&data.page_id).unwrap();
   let page_id = page_block.id;
   let text_block_id = gen_id();
@@ -48,7 +49,7 @@ async fn undo_redo_test() {
       text_id: None,
     },
   };
-  document.apply_action(vec![insert_text_action]);
+  document.apply_action(vec![insert_text_action]).unwrap();
 
   let can_undo = document.can_undo();
   assert!(can_undo);

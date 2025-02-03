@@ -1,16 +1,23 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:appflowy/core/config/kv.dart';
 import 'package:appflowy/core/config/kv_keys.dart';
+import 'package:appflowy/generated/locale_keys.g.dart';
+import 'package:appflowy/shared/icon_emoji_picker/flowy_icon_emoji_picker.dart';
 import 'package:appflowy/startup/startup.dart';
+import 'package:appflowy/util/expand_views.dart';
 import 'package:appflowy/workspace/application/favorite/favorite_listener.dart';
-import 'package:appflowy/workspace/application/recent/recent_service.dart';
+import 'package:appflowy/workspace/application/recent/cached_recent_service.dart';
 import 'package:appflowy/workspace/application/view/view_listener.dart';
 import 'package:appflowy/workspace/application/view/view_service.dart';
+import 'package:appflowy_backend/log.dart';
 import 'package:appflowy_backend/protobuf/flowy-error/errors.pb.dart';
+import 'package:appflowy_backend/protobuf/flowy-folder/protobuf.dart';
 import 'package:appflowy_backend/protobuf/flowy-folder/view.pb.dart';
 import 'package:appflowy_result/appflowy_result.dart';
 import 'package:collection/collection.dart';
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:freezed_annotation/freezed_annotation.dart';
 import 'package:protobuf/protobuf.dart';
@@ -18,23 +25,39 @@ import 'package:protobuf/protobuf.dart';
 part 'view_bloc.freezed.dart';
 
 class ViewBloc extends Bloc<ViewEvent, ViewState> {
-  ViewBloc({required this.view})
-      : viewBackendSvc = ViewBackendService(),
+  ViewBloc({
+    required this.view,
+    this.shouldLoadChildViews = true,
+    this.engagedInExpanding = false,
+  })  : viewBackendSvc = ViewBackendService(),
         listener = ViewListener(viewId: view.id),
         favoriteListener = FavoriteListener(),
         super(ViewState.init(view)) {
     _dispatch();
+    if (engagedInExpanding) {
+      expander = ViewExpander(
+        () => state.isExpanded,
+        () => add(const ViewEvent.setIsExpanded(true)),
+      );
+      getIt<ViewExpanderRegistry>().register(view.id, expander);
+    }
   }
 
   final ViewPB view;
   final ViewBackendService viewBackendSvc;
   final ViewListener listener;
   final FavoriteListener favoriteListener;
+  final bool shouldLoadChildViews;
+  final bool engagedInExpanding;
+  late ViewExpander expander;
 
   @override
   Future<void> close() async {
     await listener.stop();
     await favoriteListener.stop();
+    if (engagedInExpanding) {
+      getIt<ViewExpanderRegistry>().unregister(view.id, expander);
+    }
     return super.close();
   }
 
@@ -73,8 +96,10 @@ class ViewBloc extends Bloc<ViewEvent, ViewState> {
               },
             );
             final isExpanded = await _getViewIsExpanded(view);
-            emit(state.copyWith(isExpanded: isExpanded));
-            await _loadViewsWhenExpanded(emit, isExpanded);
+            emit(state.copyWith(isExpanded: isExpanded, view: view));
+            if (shouldLoadChildViews) {
+              await _loadChildViews(emit);
+            }
           },
           setIsEditing: (e) {
             emit(state.copyWith(isEditing: e.isEditing));
@@ -88,9 +113,7 @@ class ViewBloc extends Bloc<ViewEvent, ViewState> {
             await _setViewIsExpanded(view, e.isExpanded);
           },
           viewDidUpdate: (e) async {
-            final result = await ViewBackendService.getView(
-              view.id,
-            );
+            final result = await ViewBackendService.getView(view.id);
             final view_ = result.fold((l) => l, (r) => null);
             e.result.fold(
               (view) async {
@@ -124,9 +147,33 @@ class ViewBloc extends Bloc<ViewEvent, ViewState> {
                   final newView = view.rebuild(
                     (b) => b.name = e.newName,
                   );
+                  Log.info('rename view: ${newView.id} to ${newView.name}');
                   return state.copyWith(
                     successOrFailure: FlowyResult.success(null),
                     view: newView,
+                  );
+                },
+                (error) {
+                  Log.error('rename view failed: $error');
+                  return state.copyWith(
+                    successOrFailure: FlowyResult.failure(error),
+                  );
+                },
+              ),
+            );
+          },
+          delete: (e) async {
+            // unpublish the page and all its child pages if they are published
+            await _unpublishPage(view);
+
+            final result = await ViewBackendService.deleteView(viewId: view.id);
+
+            emit(
+              result.fold(
+                (l) {
+                  return state.copyWith(
+                    successOrFailure: FlowyResult.success(null),
+                    isDeleted: true,
                   );
                 },
                 (error) => state.copyWith(
@@ -134,22 +181,19 @@ class ViewBloc extends Bloc<ViewEvent, ViewState> {
                 ),
               ),
             );
-          },
-          delete: (e) async {
-            final result = await ViewBackendService.delete(viewId: view.id);
-            emit(
-              result.fold(
-                (l) =>
-                    state.copyWith(successOrFailure: FlowyResult.success(null)),
-                (error) => state.copyWith(
-                  successOrFailure: FlowyResult.failure(error),
-                ),
-              ),
+            await getIt<CachedRecentService>().updateRecentViews(
+              [view.id],
+              false,
             );
-            await RecentService().updateRecentViews([view.id], false);
           },
           duplicate: (e) async {
-            final result = await ViewBackendService.duplicate(view: view);
+            final result = await ViewBackendService.duplicate(
+              view: view,
+              openAfterDuplicate: true,
+              syncAfterDuplicate: true,
+              includeChildren: true,
+              suffix: ' (${LocaleKeys.menuAppHeader_pageNameSuffix.tr()})',
+            );
             emit(
               result.fold(
                 (l) =>
@@ -165,11 +209,16 @@ class ViewBloc extends Bloc<ViewEvent, ViewState> {
               viewId: value.from.id,
               newParentId: value.newParentId,
               prevViewId: value.prevId,
+              fromSection: value.fromSection,
+              toSection: value.toSection,
             );
             emit(
               result.fold(
-                (l) =>
-                    state.copyWith(successOrFailure: FlowyResult.success(null)),
+                (l) {
+                  return state.copyWith(
+                    successOrFailure: FlowyResult.success(null),
+                  );
+                },
                 (error) => state.copyWith(
                   successOrFailure: FlowyResult.failure(error),
                 ),
@@ -180,12 +229,11 @@ class ViewBloc extends Bloc<ViewEvent, ViewState> {
             final result = await ViewBackendService.createView(
               parentViewId: view.id,
               name: e.name,
-              desc: '',
               layoutType: e.layoutType,
               ext: {},
               openAfterCreate: e.openAfterCreated,
+              section: e.section,
             );
-
             emit(
               result.fold(
                 (view) => state.copyWith(
@@ -204,6 +252,32 @@ class ViewBloc extends Bloc<ViewEvent, ViewState> {
                 view: e.result,
               ),
             );
+          },
+          updateViewVisibility: (value) async {
+            final view = value.view;
+            await ViewBackendService.updateViewsVisibility(
+              [view],
+              value.isPublic,
+            );
+          },
+          updateIcon: (value) async {
+            await ViewBackendService.updateViewIcon(
+              viewId: view.id,
+              viewIcon: view.icon.toEmojiIconData(),
+            );
+          },
+          collapseAllPages: (value) async {
+            for (final childView in view.childViews) {
+              await _setViewIsExpanded(childView, false);
+            }
+            add(const ViewEvent.setIsExpanded(false));
+          },
+          unpublish: (value) async {
+            if (value.sync) {
+              await _unpublishPage(view);
+            } else {
+              unawaited(_unpublishPage(view));
+            }
           },
         );
       },
@@ -248,6 +322,33 @@ class ViewBloc extends Bloc<ViewEvent, ViewState> {
           successOrFailure: FlowyResult.failure(error),
           isExpanded: true,
           isLoading: false,
+        ),
+      ),
+    );
+  }
+
+  Future<void> _loadChildViews(
+    Emitter<ViewState> emit,
+  ) async {
+    final viewsOrFailed =
+        await ViewBackendService.getChildViews(viewId: state.view.id);
+
+    viewsOrFailed.fold(
+      (childViews) {
+        state.view.freeze();
+        final viewWithChildViews = state.view.rebuild((b) {
+          b.childViews.clear();
+          b.childViews.addAll(childViews);
+        });
+        emit(
+          state.copyWith(
+            view: viewWithChildViews,
+          ),
+        );
+      },
+      (error) => emit(
+        state.copyWith(
+          successOrFailure: FlowyResult.failure(error),
         ),
       ),
     );
@@ -304,9 +405,7 @@ class ViewBloc extends Bloc<ViewEvent, ViewState> {
     }
 
     if (update.updateChildViews.isNotEmpty) {
-      final view = await ViewBackendService.getView(
-        update.parentViewId,
-      );
+      final view = await ViewBackendService.getView(update.parentViewId);
       final childViews = view.fold((l) => l.childViews, (r) => []);
       bool isSameOrder = true;
       if (childViews.length == update.updateChildViews.length) {
@@ -327,6 +426,20 @@ class ViewBloc extends Bloc<ViewEvent, ViewState> {
     return null;
   }
 
+  // unpublish the page and all its child pages
+  Future<void> _unpublishPage(ViewPB views) async {
+    final (_, publishedPages) = await ViewBackendService.containPublishedPage(
+      view,
+    );
+
+    await Future.wait(
+      publishedPages.map((view) async {
+        Log.info('unpublishing page: ${view.id}, ${view.name}');
+        await ViewBackendService.unpublish(view);
+      }),
+    );
+  }
+
   bool _isSameViewIgnoreChildren(ViewPB from, ViewPB to) {
     return _hash(from) == _hash(to);
   }
@@ -344,27 +457,51 @@ class ViewBloc extends Bloc<ViewEvent, ViewState> {
 @freezed
 class ViewEvent with _$ViewEvent {
   const factory ViewEvent.initial() = Initial;
+
   const factory ViewEvent.setIsEditing(bool isEditing) = SetEditing;
+
   const factory ViewEvent.setIsExpanded(bool isExpanded) = SetIsExpanded;
+
   const factory ViewEvent.rename(String newName) = Rename;
+
   const factory ViewEvent.delete() = Delete;
+
   const factory ViewEvent.duplicate() = Duplicate;
+
   const factory ViewEvent.move(
     ViewPB from,
     String newParentId,
     String? prevId,
+    ViewSectionPB? fromSection,
+    ViewSectionPB? toSection,
   ) = Move;
+
   const factory ViewEvent.createView(
     String name,
     ViewLayoutPB layoutType, {
     /// open the view after created
     @Default(true) bool openAfterCreated,
+    ViewSectionPB? section,
   }) = CreateView;
+
   const factory ViewEvent.viewDidUpdate(
     FlowyResult<ViewPB, FlowyError> result,
   ) = ViewDidUpdate;
+
   const factory ViewEvent.viewUpdateChildView(ViewPB result) =
       ViewUpdateChildView;
+
+  const factory ViewEvent.updateViewVisibility(
+    ViewPB view,
+    bool isPublic,
+  ) = UpdateViewVisibility;
+
+  const factory ViewEvent.updateIcon(String? icon) = UpdateIcon;
+
+  const factory ViewEvent.collapseAllPages() = CollapseAllPages;
+
+  // this event will unpublish the page and all its child pages if they are published
+  const factory ViewEvent.unpublish({required bool sync}) = Unpublish;
 }
 
 @freezed
@@ -374,6 +511,7 @@ class ViewState with _$ViewState {
     required bool isEditing,
     required bool isExpanded,
     required FlowyResult<void, FlowyError> successOrFailure,
+    @Default(false) bool isDeleted,
     @Default(true) bool isLoading,
     @Default(null) ViewPB? lastCreatedView,
   }) = _ViewState;

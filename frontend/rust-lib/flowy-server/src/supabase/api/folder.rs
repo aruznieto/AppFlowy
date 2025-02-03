@@ -2,7 +2,7 @@ use std::str::FromStr;
 
 use anyhow::{anyhow, Error};
 use chrono::{DateTime, Utc};
-use collab::core::collab::CollabDocState;
+use collab::core::collab::DataSource;
 use collab::core::origin::CollabOrigin;
 use collab_entity::CollabType;
 use serde_json::Value;
@@ -13,7 +13,8 @@ use flowy_folder_pub::cloud::{
   gen_workspace_id, Folder, FolderCloudService, FolderCollabParams, FolderData, FolderSnapshot,
   Workspace, WorkspaceRecord,
 };
-use lib_dispatch::prelude::af_spawn;
+use flowy_folder_pub::entities::PublishPayload;
+
 use lib_infra::future::FutureResult;
 use lib_infra::util::timestamp;
 
@@ -95,16 +96,18 @@ where
       if items.is_empty() {
         return Ok(None);
       }
-      let updates = items
-        .iter()
-        .map(|update| update.value.as_ref())
-        .collect::<Vec<&[u8]>>();
-      let doc_state = merge_updates_v1(&updates)
+      let updates = items.into_iter().map(|update| update.value);
+      let doc_state = merge_updates_v1(updates)
         .map_err(|err| anyhow::anyhow!("merge updates failed: {:?}", err))?;
 
-      let folder =
-        Folder::from_collab_doc_state(uid, CollabOrigin::Empty, doc_state, &workspace_id, vec![])?;
-      Ok(folder.get_folder_data())
+      let folder = Folder::from_collab_doc_state(
+        uid,
+        CollabOrigin::Empty,
+        DataSource::DocStateV1(doc_state),
+        &workspace_id,
+        vec![],
+      )?;
+      Ok(folder.get_folder_data(&workspace_id))
     })
   }
 
@@ -137,11 +140,11 @@ where
     _uid: i64,
     collab_type: CollabType,
     object_id: &str,
-  ) -> FutureResult<CollabDocState, Error> {
+  ) -> FutureResult<Vec<u8>, Error> {
     let try_get_postgrest = self.server.try_get_weak_postgrest();
     let object_id = object_id.to_string();
     let (tx, rx) = channel();
-    af_spawn(async move {
+    tokio::spawn(async move {
       tx.send(
         async move {
           let postgrest = try_get_postgrest?;
@@ -168,6 +171,46 @@ where
 
   fn service_name(&self) -> String {
     "Supabase".to_string()
+  }
+
+  fn publish_view(
+    &self,
+    _workspace_id: &str,
+    _payload: Vec<PublishPayload>,
+  ) -> FutureResult<(), Error> {
+    FutureResult::new(async { Err(anyhow!("supabase server doesn't support publish view")) })
+  }
+
+  fn unpublish_views(
+    &self,
+    _workspace_id: &str,
+    _view_ids: Vec<String>,
+  ) -> FutureResult<(), Error> {
+    FutureResult::new(async { Err(anyhow!("supabase server doesn't support unpublish views")) })
+  }
+
+  fn get_publish_info(&self, _view_id: &str) -> FutureResult<PublishInfo, Error> {
+    FutureResult::new(async { Err(anyhow!("supabase server doesn't support publish info")) })
+  }
+
+  fn set_publish_namespace(
+    &self,
+    _workspace_id: &str,
+    _new_namespace: &str,
+  ) -> FutureResult<(), FlowyError> {
+    FutureResult::new(async {
+      Err(anyhow!(
+        "supabase server doesn't support set publish namespace"
+      ))
+    })
+  }
+
+  fn get_publish_namespace(&self, _workspace_id: &str) -> FutureResult<String, Error> {
+    FutureResult::new(async {
+      Err(anyhow!(
+        "supabase server doesn't support get publish namespace"
+      ))
+    })
   }
 }
 

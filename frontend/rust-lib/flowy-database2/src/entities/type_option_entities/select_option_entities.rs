@@ -1,8 +1,8 @@
 use crate::entities::parser::NotEmptyStr;
 use crate::entities::{CellIdPB, CellIdParams};
-use crate::services::field::checklist_type_option::ChecklistTypeOption;
-use crate::services::field::{
-  MultiSelectTypeOption, SelectOption, SelectOptionColor, SingleSelectTypeOption,
+use collab_database::fields::checklist_type_option::ChecklistTypeOption;
+use collab_database::fields::select_type_option::{
+  MultiSelectTypeOption, SelectOption, SelectOptionColor, SelectTypeOption, SingleSelectTypeOption,
 };
 use flowy_derive::{ProtoBuf, ProtoBuf_Enum};
 use flowy_error::ErrorCode;
@@ -55,9 +55,8 @@ pub struct RepeatedSelectOptionPayload {
   pub items: Vec<SelectOptionPB>,
 }
 
-#[derive(ProtoBuf_Enum, PartialEq, Eq, Debug, Clone)]
+#[derive(ProtoBuf_Enum, PartialEq, Eq, Debug, Clone, Default)]
 #[repr(u8)]
-#[derive(Default)]
 pub enum SelectOptionColorPB {
   #[default]
   Purple = 0,
@@ -103,16 +102,10 @@ impl From<SelectOptionColorPB> for SelectOptionColor {
   }
 }
 
-/// [SelectOptionCellDataPB] contains a list of user's selected options and a list of all the options
-/// that the cell can use.
+/// [SelectOptionCellDataPB] contains a list of user's selected options
 #[derive(Clone, Debug, Default, ProtoBuf)]
 pub struct SelectOptionCellDataPB {
-  /// The available options that the cell can use.
   #[pb(index = 1)]
-  pub options: Vec<SelectOptionPB>,
-
-  /// The selected options for the cell.
-  #[pb(index = 2)]
   pub select_options: Vec<SelectOptionPB>,
 }
 
@@ -219,8 +212,8 @@ pub struct SingleSelectTypeOptionPB {
   pub disable_color: bool,
 }
 
-impl From<SingleSelectTypeOption> for SingleSelectTypeOptionPB {
-  fn from(data: SingleSelectTypeOption) -> Self {
+impl From<SelectTypeOption> for SingleSelectTypeOptionPB {
+  fn from(data: SelectTypeOption) -> Self {
     Self {
       options: data
         .options
@@ -234,14 +227,14 @@ impl From<SingleSelectTypeOption> for SingleSelectTypeOptionPB {
 
 impl From<SingleSelectTypeOptionPB> for SingleSelectTypeOption {
   fn from(data: SingleSelectTypeOptionPB) -> Self {
-    Self {
+    SingleSelectTypeOption(SelectTypeOption {
       options: data
         .options
         .into_iter()
         .map(|option| option.into())
         .collect(),
       disable_color: data.disable_color,
-    }
+    })
   }
 }
 
@@ -254,8 +247,8 @@ pub struct MultiSelectTypeOptionPB {
   pub disable_color: bool,
 }
 
-impl From<MultiSelectTypeOption> for MultiSelectTypeOptionPB {
-  fn from(data: MultiSelectTypeOption) -> Self {
+impl From<SelectTypeOption> for MultiSelectTypeOptionPB {
+  fn from(data: SelectTypeOption) -> Self {
     Self {
       options: data
         .options
@@ -269,14 +262,14 @@ impl From<MultiSelectTypeOption> for MultiSelectTypeOptionPB {
 
 impl From<MultiSelectTypeOptionPB> for MultiSelectTypeOption {
   fn from(data: MultiSelectTypeOptionPB) -> Self {
-    Self {
+    MultiSelectTypeOption(SelectTypeOption {
       options: data
         .options
         .into_iter()
         .map(|option| option.into())
         .collect(),
       disable_color: data.disable_color,
-    }
+    })
   }
 }
 

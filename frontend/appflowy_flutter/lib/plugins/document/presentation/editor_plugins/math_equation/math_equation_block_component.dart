@@ -1,5 +1,8 @@
+import 'package:appflowy/generated/flowy_svgs.g.dart';
 import 'package:appflowy/generated/locale_keys.g.dart';
 import 'package:appflowy/plugins/document/presentation/editor_plugins/actions/mobile_block_action_buttons.dart';
+import 'package:appflowy/plugins/document/presentation/editor_plugins/base/selectable_svg_widget.dart';
+import 'package:appflowy/plugins/document/presentation/editor_plugins/block_menu/block_menu_button.dart';
 import 'package:appflowy_editor/appflowy_editor.dart';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flowy_infra_ui/flowy_infra_ui.dart';
@@ -10,6 +13,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_math_fork/flutter_math.dart';
 import 'package:provider/provider.dart';
+import 'package:universal_platform/universal_platform.dart';
 
 class MathEquationBlockKeys {
   const MathEquationBlockKeys._();
@@ -36,8 +40,12 @@ Node mathEquationNode({
 
 // defining the callout block menu item for selection
 SelectionMenuItem mathEquationItem = SelectionMenuItem.node(
-  getName: () => LocaleKeys.document_plugins_mathEquation_name.tr(),
-  iconData: Icons.text_fields_rounded,
+  getName: LocaleKeys.document_plugins_mathEquation_name.tr,
+  iconBuilder: (editorState, onSelected, style) => SelectableSvgWidget(
+    data: FlowySvgs.icon_math_eq_s,
+    isSelected: onSelected,
+    style: style,
+  ),
   keywords: ['tex, latex, katex', 'math equation', 'formula'],
   nodeBuilder: (editorState, _) => mathEquationNode(),
   replace: (_, node) => node.delta?.isEmpty ?? false,
@@ -75,7 +83,7 @@ class MathEquationBlockComponentBuilder extends BlockComponentBuilder {
   }
 
   @override
-  bool validate(Node node) =>
+  BlockComponentValidate get validate => (node) =>
       node.children.isEmpty &&
       node.attributes[MathEquationBlockKeys.formula] is String;
 }
@@ -103,16 +111,24 @@ class MathEquationBlockComponentWidgetState
   @override
   Node get node => widget.node;
 
-  bool isHover = false;
   String get formula =>
       widget.node.attributes[MathEquationBlockKeys.formula] as String;
 
   late final editorState = context.read<EditorState>();
+  final ValueNotifier<bool> isHover = ValueNotifier(false);
+
+  late final controller = TextEditingController(text: formula);
+
+  @override
+  void dispose() {
+    controller.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     return InkWell(
-      onHover: (value) => setState(() => isHover = value),
+      onHover: (value) => isHover.value = value,
       onTap: showEditingDialog,
       child: _build(context),
     );
@@ -124,7 +140,7 @@ class MathEquationBlockComponentWidgetState
       decoration: BoxDecoration(
         color: formula.isNotEmpty
             ? Colors.transparent
-            : Theme.of(context).colorScheme.surfaceVariant,
+            : Theme.of(context).colorScheme.surfaceContainerHighest,
         borderRadius: BorderRadius.circular(4),
       ),
       child: FlowyHover(
@@ -137,11 +153,6 @@ class MathEquationBlockComponentWidgetState
       ),
     );
 
-    child = Padding(
-      padding: padding,
-      child: child,
-    );
-
     if (widget.showActions && widget.actionBuilder != null) {
       child = BlockComponentActionWrapper(
         node: node,
@@ -150,11 +161,33 @@ class MathEquationBlockComponentWidgetState
       );
     }
 
-    if (PlatformExtension.isMobile) {
+    if (UniversalPlatform.isMobile) {
       child = MobileBlockActionButtons(
         node: node,
         editorState: editorState,
         child: child,
+      );
+    }
+
+    child = Padding(
+      padding: padding,
+      child: child,
+    );
+
+    if (UniversalPlatform.isDesktopOrWeb) {
+      child = Stack(
+        children: [
+          child,
+          Positioned(
+            right: 6,
+            top: 12,
+            child: ValueListenableBuilder<bool>(
+              valueListenable: isHover,
+              builder: (_, value, __) =>
+                  value ? _buildDeleteButton(context) : const SizedBox.shrink(),
+            ),
+          ),
+        ],
       );
     }
 
@@ -167,10 +200,15 @@ class MathEquationBlockComponentWidgetState
       child: Row(
         children: [
           const HSpace(10),
-          const Icon(Icons.text_fields_outlined),
+          FlowySvg(
+            FlowySvgs.slash_menu_icon_math_equation_s,
+            color: Theme.of(context).hintColor,
+            size: const Size.square(24),
+          ),
           const HSpace(10),
           FlowyText(
             LocaleKeys.document_plugins_mathEquation_addMathEquation.tr(),
+            color: Theme.of(context).hintColor,
           ),
         ],
       ),
@@ -186,8 +224,18 @@ class MathEquationBlockComponentWidgetState
     );
   }
 
+  Widget _buildDeleteButton(BuildContext context) {
+    return MenuBlockButton(
+      tooltip: LocaleKeys.button_delete.tr(),
+      iconData: FlowySvgs.trash_s,
+      onTap: () {
+        final transaction = editorState.transaction..deleteNode(widget.node);
+        editorState.apply(transaction);
+      },
+    );
+  }
+
   void showEditingDialog() {
-    final controller = TextEditingController(text: formula);
     showDialog(
       context: context,
       builder: (context) {
@@ -234,7 +282,7 @@ class MathEquationBlockComponentWidgetState
           actionsAlignment: MainAxisAlignment.spaceAround,
         );
       },
-    ).then((_) => controller.dispose());
+    );
   }
 
   void updateMathEquation(String mathEquation, BuildContext context) {

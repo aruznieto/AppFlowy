@@ -34,11 +34,21 @@
     "emailHint": "이메일",
     "passwordHint": "비밀번호",
     "dontHaveAnAccount": "계정이 없으신가요?",
+    "createAccount": "계정 생성",
     "repeatPasswordEmptyError": "비밀번호 재입력란은 공백일 수 없습니다",
     "unmatchedPasswordError": "재입력 하신 비밀번호가 같지 않습니다",
+    "or": "또는",
+    "signInWithMagicLink": "계속",
+    "pleaseInputYourEmail": "이메일 주소를 입력하세요",
+    "settings": "설정",
+    "invalidEmail": "유효한 이메일 주소를 입력하세요",
+    "alreadyHaveAnAccount": "이미 계정이 있나요?",
+    "logIn": "로그인",
+    "generalError": "오류가 발생했습니다. 나중에 다시 시도하세요",
     "loginAsGuestButtonText": "시작하다"
   },
   "workspace": {
+    "defaultName": "내 워크스페이스",
     "create": "워크스페이스 생성",
     "hint": "워크스페이스",
     "notFoundError": "워크스페이스를 찾을 수 없습니다"
@@ -47,14 +57,35 @@
     "buttonText": "공유",
     "workInProgress": "Coming soon",
     "markdown": "마크다운",
-    "copyLink": "링크 복사"
+    "html": "HTML",
+    "clipboard": "클립보드에 복사",
+    "csv": "CSV",
+    "copyLink": "링크 복사",
+    "publishToTheWeb": "웹에 게시",
+    "publishToTheWebHint": "AppFlowy로 웹사이트 만들기",
+    "publish": "게시",
+    "unPublish": "게시 취소",
+    "visitSite": "사이트 방문",
+    "exportAsTab": "내보내기",
+    "publishTab": "게시",
+    "shareTab": "공유",
+    "publishOnAppFlowy": "AppFlowy에 게시",
+    "shareTabTitle": "협업 초대",
+    "shareTabDescription": "누구와도 쉽게 협업할 수 있습니다",
+    "copyLinkSuccess": "클립보드에 링크 복사",
+    "copyShareLink": "공유 링크 복사",
+    "copyLinkFailed": "클립보드에 링크를 복사하는 데 실패했습니다",
+    "copyLinkToBlockSuccess": "블록 링크를 클립보드에 복사했습니다",
+    "copyLinkToBlockFailed": "블록 링크를 클립보드에 복사하는 데 실패했습니다",
+    "manageAllSites": "모든 사이트 관리",
+    "updatePathName": "경로 이름 업데이트"
   },
   "moreAction": {
     "small": "작은",
     "medium": "중간",
     "large": "크기가 큰",
     "fontSize": "글꼴 크기",
-    "import": "수입",
+    "import": "가져오기",
     "moreOptions": "추가 옵션"
   },
   "importPanel": {
@@ -72,6 +103,9 @@
   },
   "blankPageTitle": "빈 페이지",
   "newPageText": "새로운 페이지",
+  "chat": {
+    "newChat": "AI 대화"
+  },
   "trash": {
     "text": "휴지통",
     "restoreAll": "모두 복구",
@@ -177,7 +211,8 @@
     "edit": "편집하다",
     "delete": "삭제",
     "duplicate": "복제하다",
-    "putback": "다시 집어 넣어"
+    "putback": "다시 집어 넣어",
+    "share": "공유"
   },
   "label": {
     "welcome": "환영합니다!",
@@ -201,18 +236,44 @@
   },
   "settings": {
     "title": "설정",
+    "accountPage": {
+      "general": {
+        "title": "사용자 이름 & 프로필 사진",
+        "changeProfilePicture": "프로필 사진 변경"
+      }
+    },
+    "aiPage": {
+      "keys": {
+        "localAILoaded": "로컬 AI 모델이 성공적으로 추가되어 사용할 준비가 되었습니다.",
+        "localAIStart": "로컬 AI 대화 시작중...",
+        "localAILoading": "로컬 AI 대화 모델 로딩중...",
+        "localAIStopped": "로컬 AI가 중단되었습니다",
+        "failToLoadLocalAI": "로컬 AI를 시작하지 못했습니다",
+        "restartLocalAI": "로컬 AI 재시작",
+        "disableLocalAIDescription": "로컬 AI를 비활성화하시겠습니까?"
+      }
+    },
+    "planPage": {
+      "planUsage": {
+        "aiOnDeviceToggle": "최고의 개인 정보 보호를 위한 로컬 AI"
+      }
+    },
+    "cancelSurveyDialog": {
+      "questionThree": {
+        "answerFour": "로컬 AI 모델에 대한 액세스"
+      }
+    },
     "menu": {
       "appearance": "화면",
       "language": "언어",
       "user": "사용자",
       "files": "파일",
-      "open": "설정 열기",
-      "supabaseSetting": "수파베이스 설정"
+      "open": "설정 열기"
     },
     "appearance": {
       "fontFamily": {
         "label": "글꼴 패밀리",
-        "search": "찾다"
+        "search": "검색"
       },
       "themeMode": {
         "label": "테마 모드",
@@ -222,7 +283,7 @@
       },
       "themeUpload": {
         "button": "업로드",
-        "description": "아래 버튼을 사용하여 나만의 AppFlowy 테마를 업로드하세요.",
+        "description": "아래 버튼을 사용하여 나만의 @:appName 테마를 업로드하세요.",
         "loading": "테마를 확인하고 업로드하는 동안 잠시 기다려 주십시오...",
         "uploadSuccess": "테마가 성공적으로 업로드되었습니다.",
         "deletionFailure": "테마를 삭제하지 못했습니다. 수동으로 삭제해 보십시오.",
@@ -241,7 +302,7 @@
       "defaultLocation": "파일 및 데이터 저장 위치 읽기",
       "exportData": "데이터 내보내기",
       "doubleTapToCopy": "경로를 복사하려면 두 번 탭하세요.",
-      "restoreLocation": "AppFlowy 기본 경로로 복원",
+      "restoreLocation": "@:appName 기본 경로로 복원",
       "customizeLocation": "다른 폴더 열기",
       "restartApp": "변경 사항을 적용하려면 앱을 다시 시작하십시오.",
       "exportDatabase": "데이터베이스 내보내기",
@@ -253,10 +314,10 @@
       "defineWhereYourDataIsStored": "데이터가 저장되는 위치 정의",
       "open": "열려 있는",
       "openFolder": "기존 폴더 열기",
-      "openFolderDesc": "기존 AppFlowy 폴더에서 읽고 쓰기",
+      "openFolderDesc": "기존 @:appName 폴더에서 읽고 쓰기",
       "folderHintText": "폴더 이름",
       "location": "새 폴더 만들기",
-      "locationDesc": "AppFlowy 데이터 폴더의 이름을 선택하세요",
+      "locationDesc": "@:appName 데이터 폴더의 이름을 선택하세요",
       "browser": "검색",
       "create": "만들다",
       "set": "세트",
@@ -267,7 +328,7 @@
       "change": "변화",
       "openLocationTooltips": "다른 데이터 디렉토리 열기",
       "openCurrentDataFolder": "현재 데이터 디렉토리 열기",
-      "recoverLocationTooltips": "AppFlowy의 기본 데이터 디렉터리로 재설정",
+      "recoverLocationTooltips": "@:appName의 기본 데이터 디렉터리로 재설정",
       "exportFileSuccess": "파일을 성공적으로 내보냈습니다!",
       "exportFileFail": "파일 내보내기 실패!",
       "export": "내보내다"
@@ -275,7 +336,7 @@
     "user": {
       "name": "이름",
       "selectAnIcon": "아이콘을 선택하세요",
-      "pleaseInputYourOpenAIKey": "OpenAI 키를 입력하십시오"
+      "pleaseInputYourOpenAIKey": "AI 키를 입력하십시오"
     }
   },
   "grid": {
@@ -405,7 +466,7 @@
     "referencedGridPrefix": "관점"
   },
   "document": {
-    "menuName": "도큐먼트",
+    "menuName": "문서",
     "date": {
       "timeHintTextInTwelveHour": "01:00 PM",
       "timeHintTextInTwentyFourHour": "13:00"
@@ -431,23 +492,23 @@
       "referencedBoard": "참조 보드",
       "referencedGrid": "참조된 그리드",
       "referencedCalendar": "참조된 달력",
-      "autoGeneratorMenuItemName": "OpenAI 작성자",
-      "autoGeneratorTitleName": "OpenAI: AI에게 무엇이든 쓰라고 요청하세요...",
+      "autoGeneratorMenuItemName": "AI 작성자",
+      "autoGeneratorTitleName": "AI: AI에게 무엇이든 쓰라고 요청하세요...",
       "autoGeneratorLearnMore": "더 알아보기",
       "autoGeneratorGenerate": "생성하다",
       "autoGeneratorHintText": "OpenAI에게 물어보세요 ...",
-      "autoGeneratorCantGetOpenAIKey": "OpenAI 키를 가져올 수 없습니다.",
+      "autoGeneratorCantGetOpenAIKey": "AI 키를 가져올 수 없습니다.",
       "autoGeneratorRewrite": "고쳐 쓰기",
       "smartEdit": "AI 어시스턴트",
-      "openAI": "OpenAI",
+      "aI": "AI",
       "smartEditFixSpelling": "맞춤법 수정",
       "warning": "⚠️ AI 응답은 부정확하거나 오해의 소지가 있을 수 있습니다.",
       "smartEditSummarize": "요약하다",
       "smartEditImproveWriting": "쓰기 향상",
       "smartEditMakeLonger": "더 길게",
       "smartEditCouldNotFetchResult": "OpenAI에서 결과를 가져올 수 없습니다.",
-      "smartEditCouldNotFetchKey": "OpenAI 키를 가져올 수 없습니다.",
-      "smartEditDisabled": "설정에서 OpenAI 연결",
+      "smartEditCouldNotFetchKey": "AI 키를 가져올 수 없습니다.",
+      "smartEditDisabled": "설정에서 AI 연결",
       "discardResponse": "AI 응답을 삭제하시겠습니까?",
       "createInlineMathEquation": "방정식 만들기",
       "toggleList": "토글 목록",
@@ -547,8 +608,13 @@
     "column": {
       "createNewCard": "추가"
     },
-    "menuName": "판자",
-    "referencedBoardPrefix": "관점"
+    "menuName": "보드",
+    "referencedBoardPrefix": "관점",
+    "mobile": {
+      "showGroup": "그룹 표시",
+      "showGroupContent": "이 그룹을 보드에 표시하시겠습니까?",
+      "failedToLoad": "보드 보기를 로드하지 못했습니다."
+    }
   },
   "calendar": {
     "menuName": "달력",
@@ -572,12 +638,12 @@
     "referencedCalendarPrefix": "관점"
   },
   "errorDialog": {
-    "title": "AppFlowy 오류",
+    "title": "@:appName 오류",
     "howToFixFallback": "불편을 끼쳐드려 죄송합니다! 오류를 설명하는 문제를 GitHub 페이지에 제출하세요.",
     "github": "GitHub에서 보기"
   },
   "search": {
-    "label": "찾다",
+    "label": "검색",
     "placeholder": {
       "actions": "검색 작업..."
     }
@@ -592,5 +658,33 @@
   "views": {
     "deleteContentTitle": "{pageType}을(를) 삭제하시겠습니까?",
     "deleteContentCaption": "이 {pageType}을(를) 삭제하면 휴지통에서 복원할 수 있습니다."
+  },
+  "newSettings": {
+    "myAccount": {
+      "deleteAccount": {
+        "dialogContent2": "이 작업은 실행 취소할 수 없으며 모든 작업 공간에서의 액세스가 제거되고, 개인 작업 공간을 포함한 전체 계정이 삭제되고, 모든 공유 작업 공간에서 제거됩니다."
+      }
+    }
+  },
+  "space": {
+    "createNewSpace": "새로운 스페이스 생성",
+    "defaultSpaceName": "일반"
+  },
+  "publish": {
+    "saveThisPage": "이 템플릿으로 시작"
+  },
+  "template": {
+    "deleteFromTemplate": "템플릿 목록에서 제거",
+    "relatedTemplates": "관련된 템플릿 목록",
+    "deleteTemplate": "템플릿 제거",
+    "removeRelatedTemplate": "관련된 템플릿 제거",
+    "label": "템플릿 목록"
+  },
+  "subscribe": {
+    "cancelPlan": {
+      "questionThree": {
+        "answerFour": "로컬 AI 모델에 대한 액세스"
+      }
+    }
   }
 }

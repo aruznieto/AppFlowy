@@ -9,17 +9,14 @@ import 'package:appflowy/user/presentation/router.dart';
 import 'package:appflowy/user/presentation/screens/screens.dart';
 import 'package:appflowy_backend/dispatch/dispatch.dart';
 import 'package:appflowy_backend/log.dart';
-import 'package:appflowy_editor/appflowy_editor.dart' hide Log;
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
+import 'package:universal_platform/universal_platform.dart';
 
 class SplashScreen extends StatelessWidget {
   /// Root Page of the app.
-  const SplashScreen({
-    super.key,
-    required this.isAnon,
-  });
+  const SplashScreen({super.key, required this.isAnon});
 
   final bool isAnon;
 
@@ -95,7 +92,7 @@ class SplashScreen extends StatelessWidget {
 
   void _handleUnauthenticated(BuildContext context, Unauthenticated result) {
     // replace Splash screen as root page
-    if (isAuthEnabled || PlatformExtension.isMobile) {
+    if (isAuthEnabled || UniversalPlatform.isMobile) {
       context.go(SignInScreen.routeName);
     } else {
       // if the env is not configured, we will skip to the 'skip login screen'.
@@ -105,7 +102,7 @@ class SplashScreen extends StatelessWidget {
 
   Future<void> _registerIfNeeded() async {
     final result = await UserEventGetUserProfile().send();
-    if (result.isFailure()) {
+    if (result.isFailure) {
       await getIt<AuthService>().signUpAsGuest();
     }
   }
@@ -117,11 +114,8 @@ class Body extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       alignment: Alignment.center,
-      child: PlatformExtension.isMobile
-          ? const FlowySvg(
-              FlowySvgs.flowy_logo_xl,
-              blendMode: null,
-            )
+      child: UniversalPlatform.isMobile
+          ? const FlowySvg(FlowySvgs.flowy_logo_xl, blendMode: null)
           : const _DesktopSplashBody(),
     );
   }

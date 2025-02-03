@@ -1,13 +1,14 @@
+import 'package:flowy_infra_ui/flowy_infra_ui.dart';
 import 'package:flutter/material.dart';
 
 import 'package:appflowy/generated/flowy_svgs.g.dart';
 import 'package:appflowy/generated/locale_keys.g.dart';
+import 'package:appflowy/plugins/database/grid/presentation/widgets/header/field_type_extension.dart';
 import 'package:appflowy_backend/protobuf/flowy-database2/field_entities.pb.dart';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flowy_infra/size.dart';
 import 'package:flowy_infra/theme_extension.dart';
 import 'package:flowy_infra_ui/style_widget/hover.dart';
-import 'package:flowy_infra_ui/widget/flowy_tooltip.dart';
 import 'package:styled_widget/styled_widget.dart';
 
 import '../../cell/editable_cell_builder.dart';
@@ -69,19 +70,32 @@ class _PrimaryCellAccessoryState extends State<PrimaryCellAccessory>
     with GridCellAccessoryState {
   @override
   Widget build(BuildContext context) {
-    return FlowyTooltip(
-      message: LocaleKeys.tooltip_openAsPage.tr(),
-      child: SizedBox(
-        width: 26,
-        height: 26,
-        child: Padding(
-          padding: const EdgeInsets.all(3.0),
-          child: FlowySvg(
-            FlowySvgs.full_view_s,
-            color: Theme.of(context).colorScheme.primary,
-          ),
-        ),
+    return FlowyHover(
+      style: HoverStyle(
+        hoverColor: AFThemeExtension.of(context).lightGreyHover,
+        backgroundColor: Theme.of(context).cardColor,
       ),
+      builder: (_, onHover) {
+        return FlowyTooltip(
+          message: LocaleKeys.tooltip_openAsPage.tr(),
+          child: Container(
+            width: 26,
+            height: 26,
+            decoration: BoxDecoration(
+              border: Border.fromBorderSide(
+                BorderSide(color: Theme.of(context).dividerColor),
+              ),
+              borderRadius: Corners.s6Border,
+            ),
+            child: Center(
+              child: FlowySvg(
+                FlowySvgs.full_view_s,
+                color: Theme.of(context).colorScheme.primary,
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 
@@ -111,6 +125,12 @@ class _AccessoryHoverState extends State<AccessoryHover> {
 
   @override
   Widget build(BuildContext context) {
+    // Some FieldType has built-in handling for more gestures
+    // and granular control, so we don't need to show the accessory.
+    if (!widget.fieldType.showRowDetailAccessory) {
+      return widget.child;
+    }
+
     final List<Widget> children = [
       DecoratedBox(
         decoration: BoxDecoration(
@@ -161,18 +181,16 @@ class CellAccessoryContainer extends StatelessWidget {
   Widget build(BuildContext context) {
     final children =
         accessories.where((accessory) => accessory.enable()).map((accessory) {
-      final hover = FlowyHover(
-        style:
-            HoverStyle(hoverColor: AFThemeExtension.of(context).lightGreyHover),
-        builder: (_, onHover) => accessory.build(),
-      );
       return GestureDetector(
         behavior: HitTestBehavior.opaque,
         onTap: () => accessory.onTap(),
-        child: hover,
+        child: accessory.build(),
       );
     }).toList();
 
-    return Wrap(spacing: 6, children: children);
+    return SeparatedRow(
+      separatorBuilder: () => const HSpace(6),
+      children: children,
+    );
   }
 }

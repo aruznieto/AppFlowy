@@ -1,32 +1,39 @@
-use anyhow::Error;
-use collab::core::collab::CollabDocState;
+use collab::entity::EncodedCollab;
 pub use collab_document::blocks::DocumentData;
 
 use flowy_error::FlowyError;
-use lib_infra::future::FutureResult;
+use lib_infra::async_trait::async_trait;
 
 /// A trait for document cloud service.
 /// Each kind of server should implement this trait. Check out the [AppFlowyServerProvider] of
 /// [flowy-server] crate for more information.
+#[async_trait]
 pub trait DocumentCloudService: Send + Sync + 'static {
-  fn get_document_doc_state(
+  async fn get_document_doc_state(
     &self,
     document_id: &str,
     workspace_id: &str,
-  ) -> FutureResult<CollabDocState, FlowyError>;
+  ) -> Result<Vec<u8>, FlowyError>;
 
-  fn get_document_snapshots(
+  async fn get_document_snapshots(
     &self,
     document_id: &str,
     limit: usize,
     workspace_id: &str,
-  ) -> FutureResult<Vec<DocumentSnapshot>, Error>;
+  ) -> Result<Vec<DocumentSnapshot>, FlowyError>;
 
-  fn get_document_data(
+  async fn get_document_data(
     &self,
     document_id: &str,
     workspace_id: &str,
-  ) -> FutureResult<Option<DocumentData>, Error>;
+  ) -> Result<Option<DocumentData>, FlowyError>;
+
+  async fn create_document_collab(
+    &self,
+    workspace_id: &str,
+    document_id: &str,
+    encoded_collab: EncodedCollab,
+  ) -> Result<(), FlowyError>;
 }
 
 pub struct DocumentSnapshot {

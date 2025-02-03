@@ -1,11 +1,11 @@
-import 'package:flutter/material.dart';
-
 import 'package:appflowy/generated/locale_keys.g.dart';
 import 'package:appflowy/startup/startup.dart';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flowy_infra/size.dart';
 import 'package:flowy_infra_ui/style_widget/text.dart';
+import 'package:flutter/material.dart';
 import 'package:fluttertoast/fluttertoast.dart';
+import 'package:universal_platform/universal_platform.dart';
 
 class FlowyMessageToast extends StatelessWidget {
   const FlowyMessageToast({required this.message, super.key});
@@ -41,8 +41,7 @@ void showMessageToast(
   ToastGravity gravity = ToastGravity.BOTTOM,
 }) {
   final child = FlowyMessageToast(message: message);
-  final toast = context == null ? getIt<FToast>() : FToast()
-    ..init(context!);
+  final toast = context == null ? getIt<FToast>() : (FToast()..init(context));
   toast.showToast(
     child: child,
     gravity: gravity,
@@ -54,10 +53,12 @@ void showSnackBarMessage(
   BuildContext context,
   String message, {
   bool showCancel = false,
+  Duration duration = const Duration(seconds: 4),
 }) {
   ScaffoldMessenger.of(context).showSnackBar(
     SnackBar(
-      backgroundColor: Theme.of(context).colorScheme.onSecondary,
+      backgroundColor: Theme.of(context).colorScheme.surfaceContainerHighest,
+      duration: duration,
       action: !showCancel
           ? null
           : SnackBarAction(
@@ -69,7 +70,8 @@ void showSnackBarMessage(
             ),
       content: FlowyText(
         message,
-        color: Colors.white,
+        maxLines: 2,
+        fontSize: UniversalPlatform.isDesktop ? 14 : 12,
       ),
     ),
   );

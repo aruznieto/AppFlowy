@@ -1,16 +1,20 @@
-import 'package:flutter/material.dart';
-
 import 'package:appflowy/generated/locale_keys.g.dart';
 import 'package:appflowy/plugins/database/grid/application/row/row_document_bloc.dart';
-import 'package:appflowy/plugins/document/application/doc_bloc.dart';
+import 'package:appflowy/plugins/document/application/document_bloc.dart';
+import 'package:appflowy/plugins/document/presentation/editor_drop_handler.dart';
+import 'package:appflowy/plugins/document/presentation/editor_drop_manager.dart';
 import 'package:appflowy/plugins/document/presentation/editor_page.dart';
+import 'package:appflowy/plugins/document/presentation/editor_plugins/shared_context/shared_context.dart';
+import 'package:appflowy/plugins/document/presentation/editor_plugins/transaction_handler/editor_transaction_service.dart';
 import 'package:appflowy/plugins/document/presentation/editor_style.dart';
+import 'package:appflowy/shared/flowy_error_page.dart';
 import 'package:appflowy/workspace/application/view_info/view_info_bloc.dart';
 import 'package:appflowy_backend/log.dart';
 import 'package:appflowy_backend/protobuf/flowy-folder/view.pb.dart';
 import 'package:easy_localization/easy_localization.dart';
-import 'package:flowy_infra_ui/widget/error_page.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:provider/provider.dart';
 
 class RowDocument extends StatelessWidget {
   const RowDocument({
@@ -27,18 +31,23 @@ class RowDocument extends StatelessWidget {
     return BlocProvider<RowDocumentBloc>(
       create: (context) => RowDocumentBloc(viewId: viewId, rowId: rowId)
         ..add(const RowDocumentEvent.initial()),
-      child: BlocBuilder<RowDocumentBloc, RowDocumentState>(
+      child: BlocConsumer<RowDocumentBloc, RowDocumentState>(
+        listener: (_, state) => state.loadingState.maybeWhen(
+          error: (error) => Log.error('RowDocument error: $error'),
+          orElse: () => null,
+        ),
         builder: (context, state) {
           return state.loadingState.when(
             loading: () => const Center(
               child: CircularProgressIndicator.adaptive(),
             ),
-            error: (error) => FlowyErrorPage.message(
-              error.toString(),
-              howToFix: LocaleKeys.errorDialog_howToFixFallback.tr(),
+            error: (error) => Center(
+              child: AppFlowyErrorPage(
+                error: error,
+              ),
             ),
-            finish: () => RowEditor(
-              viewPB: state.viewPB!,
+            finish: () => _RowEditor(
+              view: state.viewPB!,
               onIsEmptyChanged: (isEmpty) => context
                   .read<RowDocumentBloc>()
                   .add(RowDocumentEvent.updateIsEmpty(isEmpty)),
@@ -50,89 +59,87 @@ class RowDocument extends StatelessWidget {
   }
 }
 
-class RowEditor extends StatefulWidget {
-  const RowEditor({
-    super.key,
-    required this.viewPB,
+class _RowEditor extends StatelessWidget {
+  const _RowEditor({
+    required this.view,
     this.onIsEmptyChanged,
   });
 
-  final ViewPB viewPB;
+  final ViewPB view;
   final void Function(bool)? onIsEmptyChanged;
 
   @override
-  State<RowEditor> createState() => _RowEditorState();
-}
-
-class _RowEditorState extends State<RowEditor> {
-  late final DocumentBloc documentBloc;
-
-  @override
-  void initState() {
-    super.initState();
-    documentBloc = DocumentBloc(view: widget.viewPB)
-      ..add(const DocumentEvent.initial());
-  }
-
-  @override
-  void dispose() {
-    documentBloc.close();
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
-    return MultiBlocProvider(
-      providers: [
-        BlocProvider.value(value: documentBloc),
-      ],
-      child: BlocListener<DocumentBloc, DocumentState>(
+    return BlocProvider(
+      create: (_) =>
+          DocumentBloc(documentId: view.id)..add(const DocumentEvent.initial()),
+      child: BlocConsumer<DocumentBloc, DocumentState>(
         listenWhen: (previous, current) =>
             previous.isDocumentEmpty != current.isDocumentEmpty,
-        listener: (context, state) {
+        listener: (_, state) {
           if (state.isDocumentEmpty != null) {
-            widget.onIsEmptyChanged?.call(state.isDocumentEmpty!);
+            onIsEmptyChanged?.call(state.isDocumentEmpty!);
+          }
+          if (state.error != null) {
+            Log.error('RowEditor error: ${state.error}');
+          }
+          if (state.editorState == null) {
+            Log.error('RowEditor unable to get editorState');
           }
         },
-        child: BlocBuilder<DocumentBloc, DocumentState>(
-          builder: (context, state) {
-            if (state.isLoading) {
-              return const Center(child: CircularProgressIndicator.adaptive());
-            }
+        builder: (context, state) {
+          if (state.isLoading) {
+            return const Center(child: CircularProgressIndicator.adaptive());
+          }
 
-            final editorState = state.editorState;
-            final error = state.error;
-            if (error != null || editorState == null) {
-              Log.error(error);
-              return FlowyErrorPage.message(
-                error.toString(),
-                howToFix: LocaleKeys.errorDialog_howToFixFallback.tr(),
-              );
-            }
+          final editorState = state.editorState;
+          final error = state.error;
+          if (error != null || editorState == null) {
+            return Center(
+              child: AppFlowyErrorPage(error: error),
+            );
+          }
 
-            return IntrinsicHeight(
+          return BlocProvider<ViewInfoBloc>(
+            create: (context) => ViewInfoBloc(view: view),
+            child: IntrinsicHeight(
               child: Container(
                 constraints: const BoxConstraints(minHeight: 300),
-                child: BlocProvider<ViewInfoBloc>(
-                  create: (context) => ViewInfoBloc(view: widget.viewPB),
-                  child: AppFlowyEditorPage(
-                    shrinkWrap: true,
-                    autoFocus: false,
+                child: Provider(
+                  create: (_) {
+                    final context = SharedEditorContext();
+                    context.isInDatabaseRowPage = true;
+                    return context;
+                  },
+                  dispose: (_, editorContext) => editorContext.dispose(),
+                  child: EditorDropHandler(
+                    viewId: view.id,
                     editorState: editorState,
-                    styleCustomizer: EditorStyleCustomizer(
-                      context: context,
-                      padding: const EdgeInsets.only(left: 16, right: 54),
+                    isLocalMode: context.read<DocumentBloc>().isLocalMode,
+                    dropManagerState: context.read<EditorDropManagerState>(),
+                    child: EditorTransactionService(
+                      viewId: view.id,
+                      editorState: editorState,
+                      child: AppFlowyEditorPage(
+                        shrinkWrap: true,
+                        autoFocus: false,
+                        editorState: editorState,
+                        styleCustomizer: EditorStyleCustomizer(
+                          context: context,
+                          padding: const EdgeInsets.only(left: 16, right: 54),
+                        ),
+                        showParagraphPlaceholder: (editorState, _) =>
+                            editorState.document.isEmpty,
+                        placeholderText: (_) =>
+                            LocaleKeys.cardDetails_notesPlaceholder.tr(),
+                      ),
                     ),
-                    showParagraphPlaceholder: (editorState, node) =>
-                        editorState.document.isEmpty,
-                    placeholderText: (node) =>
-                        LocaleKeys.cardDetails_notesPlaceholder.tr(),
                   ),
                 ),
               ),
-            );
-          },
-        ),
+            ),
+          );
+        },
       ),
     );
   }

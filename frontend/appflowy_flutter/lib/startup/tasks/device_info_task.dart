@@ -1,31 +1,73 @@
 import 'dart:io';
 
+import 'package:appflowy_backend/log.dart';
 import 'package:device_info_plus/device_info_plus.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 
 import '../startup.dart';
 
-class DeviceOrApplicationInfoTask extends LaunchTask {
-  const DeviceOrApplicationInfoTask();
-
+class ApplicationInfo {
   static int androidSDKVersion = -1;
   static String applicationVersion = '';
   static String buildNumber = '';
+  static String deviceId = '';
+
+  // macOS major version
+  static int? macOSMajorVersion;
+  static int? macOSMinorVersion;
+}
+
+class ApplicationInfoTask extends LaunchTask {
+  const ApplicationInfoTask();
 
   @override
   Future<void> initialize(LaunchContext context) async {
     final DeviceInfoPlugin deviceInfoPlugin = DeviceInfoPlugin();
     final PackageInfo packageInfo = await PackageInfo.fromPlatform();
 
+    if (Platform.isMacOS) {
+      final macInfo = await deviceInfoPlugin.macOsInfo;
+      ApplicationInfo.macOSMajorVersion = macInfo.majorVersion;
+      ApplicationInfo.macOSMinorVersion = macInfo.minorVersion;
+    }
+
     if (Platform.isAndroid) {
       final androidInfo = await deviceInfoPlugin.androidInfo;
-      androidSDKVersion = androidInfo.version.sdkInt;
+      ApplicationInfo.androidSDKVersion = androidInfo.version.sdkInt;
     }
 
     if (Platform.isAndroid || Platform.isIOS) {
-      applicationVersion = packageInfo.version;
-      buildNumber = packageInfo.buildNumber;
+      ApplicationInfo.applicationVersion = packageInfo.version;
+      ApplicationInfo.buildNumber = packageInfo.buildNumber;
     }
+
+    String? deviceId;
+    try {
+      if (Platform.isAndroid) {
+        final AndroidDeviceInfo androidInfo =
+            await deviceInfoPlugin.androidInfo;
+        deviceId = androidInfo.device;
+      } else if (Platform.isIOS) {
+        final IosDeviceInfo iosInfo = await deviceInfoPlugin.iosInfo;
+        deviceId = iosInfo.identifierForVendor;
+      } else if (Platform.isMacOS) {
+        final MacOsDeviceInfo macInfo = await deviceInfoPlugin.macOsInfo;
+        deviceId = macInfo.systemGUID;
+      } else if (Platform.isWindows) {
+        final WindowsDeviceInfo windowsInfo =
+            await deviceInfoPlugin.windowsInfo;
+        deviceId = windowsInfo.deviceId;
+      } else if (Platform.isLinux) {
+        final LinuxDeviceInfo linuxInfo = await deviceInfoPlugin.linuxInfo;
+        deviceId = linuxInfo.machineId;
+      } else {
+        deviceId = null;
+      }
+    } catch (e) {
+      Log.error('Failed to get platform version, $e');
+    }
+
+    ApplicationInfo.deviceId = deviceId ?? '';
   }
 
   @override

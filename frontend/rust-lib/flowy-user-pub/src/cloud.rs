@@ -1,10 +1,14 @@
-use anyhow::Error;
-use collab::core::collab::CollabDocState;
+use client_api::entity::billing_dto::RecurringInterval;
+use client_api::entity::billing_dto::SubscriptionPlan;
+use client_api::entity::billing_dto::SubscriptionPlanDetail;
+pub use client_api::entity::billing_dto::SubscriptionStatus;
+use client_api::entity::billing_dto::WorkspaceSubscriptionStatus;
+use client_api::entity::billing_dto::WorkspaceUsageAndLimit;
+pub use client_api::entity::{AFWorkspaceSettings, AFWorkspaceSettingsChange};
 use collab_entity::{CollabObject, CollabType};
-use flowy_error::{ErrorCode, FlowyError};
+use flowy_error::{internal_error, ErrorCode, FlowyError};
+use lib_infra::async_trait::async_trait;
 use lib_infra::box_any::BoxAny;
-use lib_infra::conditional_send_sync_trait;
-use lib_infra::future::FutureResult;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::HashMap;
@@ -16,7 +20,7 @@ use uuid::Uuid;
 
 use crate::entities::{
   AuthResponse, Authenticator, Role, UpdateUserProfileParams, UserCredentials, UserProfile,
-  UserTokenState, UserWorkspace, WorkspaceMember,
+  UserTokenState, UserWorkspace, WorkspaceInvitation, WorkspaceInvitationStatus, WorkspaceMember,
 };
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -54,12 +58,7 @@ impl Display for UserCloudConfig {
   }
 }
 
-conditional_send_sync_trait! {
-  "This trait is intended for implementation by providers that offer cloud-based services for users.
-  It includes methods for handling authentication tokens, enabling/disabling synchronization,
-  setting network reachability, managing encryption secrets, and accessing user-specific cloud services.";
-
-  UserCloudServiceProvider {
+pub trait UserCloudServiceProvider: Send + Sync {
   /// Sets the authentication token for the cloud service.
   ///
   /// # Arguments
@@ -68,6 +67,7 @@ conditional_send_sync_trait! {
   /// # Returns
   /// A `Result` which is `Ok` if the token is successfully set, or a `FlowyError` otherwise.
   fn set_token(&self, token: &str) -> Result<(), FlowyError>;
+  fn set_ai_model(&self, ai_model: &str) -> Result<(), FlowyError>;
 
   /// Subscribes to the state of the authentication token.
   ///
@@ -114,107 +114,141 @@ conditional_send_sync_trait! {
   /// # Returns
   /// A `String` representing the service URL.
   fn service_url(&self) -> String;
-  }
 }
+
 /// Provide the generic interface for the user cloud service
 /// The user cloud service is responsible for the user authentication and user profile management
 #[allow(unused_variables)]
+#[async_trait]
 pub trait UserCloudService: Send + Sync + 'static {
   /// Sign up a new account.
   /// The type of the params is defined the this trait's implementation.
   /// Use the `unbox_or_error` of the [BoxAny] to get the params.
-  fn sign_up(&self, params: BoxAny) -> FutureResult<AuthResponse, FlowyError>;
+  async fn sign_up(&self, params: BoxAny) -> Result<AuthResponse, FlowyError>;
 
   /// Sign in an account
   /// The type of the params is defined the this trait's implementation.
-  fn sign_in(&self, params: BoxAny) -> FutureResult<AuthResponse, FlowyError>;
+  async fn sign_in(&self, params: BoxAny) -> Result<AuthResponse, FlowyError>;
 
   /// Sign out an account
-  fn sign_out(&self, token: Option<String>) -> FutureResult<(), FlowyError>;
+  async fn sign_out(&self, token: Option<String>) -> Result<(), FlowyError>;
+
+  /// Delete an account and all the data associated with the account
+  async fn delete_account(&self) -> Result<(), FlowyError> {
+    Err(FlowyError::not_support())
+  }
 
   /// Generate a sign in url for the user with the given email
   /// Currently, only use the admin client for testing
-  fn generate_sign_in_url_with_email(&self, email: &str) -> FutureResult<String, FlowyError>;
+  async fn generate_sign_in_url_with_email(&self, email: &str) -> Result<String, FlowyError>;
 
-  fn create_user(&self, email: &str, password: &str) -> FutureResult<(), FlowyError>;
+  async fn create_user(&self, email: &str, password: &str) -> Result<(), FlowyError>;
 
-  fn sign_in_with_password(
+  async fn sign_in_with_password(
     &self,
     email: &str,
     password: &str,
-  ) -> FutureResult<UserProfile, FlowyError>;
+  ) -> Result<UserProfile, FlowyError>;
+
+  async fn sign_in_with_magic_link(&self, email: &str, redirect_to: &str)
+    -> Result<(), FlowyError>;
 
   /// When the user opens the OAuth URL, it redirects to the corresponding provider's OAuth web page.
   /// After the user is authenticated, the browser will open a deep link to the AppFlowy app (iOS, macOS, etc.),
   /// which will call [Client::sign_in_with_url]generate_sign_in_url_with_email to sign in.
   ///
   /// For example, the OAuth URL on Google looks like `https://appflowy.io/authorize?provider=google`.
-  fn generate_oauth_url_with_provider(&self, provider: &str) -> FutureResult<String, FlowyError>;
+  async fn generate_oauth_url_with_provider(&self, provider: &str) -> Result<String, FlowyError>;
 
   /// Using the user's token to update the user information
-  fn update_user(
+  async fn update_user(
     &self,
     credential: UserCredentials,
     params: UpdateUserProfileParams,
-  ) -> FutureResult<(), FlowyError>;
+  ) -> Result<(), FlowyError>;
 
   /// Get the user information using the user's token or uid
   /// return None if the user is not found
-  fn get_user_profile(&self, credential: UserCredentials) -> FutureResult<UserProfile, FlowyError>;
+  async fn get_user_profile(&self, credential: UserCredentials) -> Result<UserProfile, FlowyError>;
 
-  fn open_workspace(&self, workspace_id: &str) -> FutureResult<UserWorkspace, FlowyError>;
+  async fn open_workspace(&self, workspace_id: &str) -> Result<UserWorkspace, FlowyError>;
 
   /// Return the all the workspaces of the user
-  fn get_all_workspace(&self, uid: i64) -> FutureResult<Vec<UserWorkspace>, FlowyError>;
+  async fn get_all_workspace(&self, uid: i64) -> Result<Vec<UserWorkspace>, FlowyError>;
 
   /// Creates a new workspace for the user.
   /// Returns the new workspace if successful
-  fn create_workspace(&self, workspace_name: &str) -> FutureResult<UserWorkspace, FlowyError>;
+  async fn create_workspace(&self, workspace_name: &str) -> Result<UserWorkspace, FlowyError>;
 
   // Updates the workspace name and icon
-  fn patch_workspace(
+  async fn patch_workspace(
     &self,
     workspace_id: &str,
     new_workspace_name: Option<&str>,
     new_workspace_icon: Option<&str>,
-  ) -> FutureResult<(), FlowyError>;
+  ) -> Result<(), FlowyError>;
 
   /// Deletes a workspace owned by the user.
-  fn delete_workspace(&self, workspace_id: &str) -> FutureResult<(), FlowyError>;
+  async fn delete_workspace(&self, workspace_id: &str) -> Result<(), FlowyError>;
 
-  fn add_workspace_member(
+  async fn invite_workspace_member(
+    &self,
+    invitee_email: String,
+    workspace_id: String,
+    role: Role,
+  ) -> Result<(), FlowyError> {
+    Ok(())
+  }
+
+  async fn list_workspace_invitations(
+    &self,
+    filter: Option<WorkspaceInvitationStatus>,
+  ) -> Result<Vec<WorkspaceInvitation>, FlowyError> {
+    Ok(vec![])
+  }
+
+  async fn accept_workspace_invitations(&self, invite_id: String) -> Result<(), FlowyError> {
+    Ok(())
+  }
+
+  async fn remove_workspace_member(
     &self,
     user_email: String,
     workspace_id: String,
-  ) -> FutureResult<(), Error> {
-    FutureResult::new(async { Ok(()) })
+  ) -> Result<(), FlowyError> {
+    Ok(())
   }
 
-  fn remove_workspace_member(
-    &self,
-    user_email: String,
-    workspace_id: String,
-  ) -> FutureResult<(), Error> {
-    FutureResult::new(async { Ok(()) })
-  }
-
-  fn update_workspace_member(
+  async fn update_workspace_member(
     &self,
     user_email: String,
     workspace_id: String,
     role: Role,
-  ) -> FutureResult<(), Error> {
-    FutureResult::new(async { Ok(()) })
+  ) -> Result<(), FlowyError> {
+    Ok(())
   }
 
-  fn get_workspace_members(
+  async fn get_workspace_members(
     &self,
     workspace_id: String,
-  ) -> FutureResult<Vec<WorkspaceMember>, Error> {
-    FutureResult::new(async { Ok(vec![]) })
+  ) -> Result<Vec<WorkspaceMember>, FlowyError> {
+    Ok(vec![])
   }
 
-  fn get_user_awareness_doc_state(&self, uid: i64) -> FutureResult<CollabDocState, Error>;
+  async fn get_workspace_member(
+    &self,
+    workspace_id: String,
+    uid: i64,
+  ) -> Result<WorkspaceMember, FlowyError> {
+    Err(FlowyError::not_support())
+  }
+
+  async fn get_user_awareness_doc_state(
+    &self,
+    uid: i64,
+    workspace_id: &str,
+    object_id: &str,
+  ) -> Result<Vec<u8>, FlowyError>;
 
   fn receive_realtime_event(&self, _json: Value) {}
 
@@ -222,20 +256,111 @@ pub trait UserCloudService: Send + Sync + 'static {
     None
   }
 
-  fn reset_workspace(&self, collab_object: CollabObject) -> FutureResult<(), Error>;
+  async fn reset_workspace(&self, collab_object: CollabObject) -> Result<(), FlowyError>;
 
-  fn create_collab_object(
+  async fn create_collab_object(
     &self,
     collab_object: &CollabObject,
     data: Vec<u8>,
-    override_if_exist: bool,
-  ) -> FutureResult<(), FlowyError>;
+  ) -> Result<(), FlowyError>;
 
-  fn batch_create_collab_object(
+  async fn batch_create_collab_object(
     &self,
     workspace_id: &str,
     objects: Vec<UserCollabParams>,
-  ) -> FutureResult<(), Error>;
+  ) -> Result<(), FlowyError>;
+
+  async fn leave_workspace(&self, workspace_id: &str) -> Result<(), FlowyError> {
+    Ok(())
+  }
+
+  async fn subscribe_workspace(
+    &self,
+    workspace_id: String,
+    recurring_interval: RecurringInterval,
+    workspace_subscription_plan: SubscriptionPlan,
+    success_url: String,
+  ) -> Result<String, FlowyError> {
+    Err(FlowyError::not_support())
+  }
+
+  async fn get_workspace_member_info(
+    &self,
+    workspace_id: &str,
+    uid: i64,
+  ) -> Result<WorkspaceMember, FlowyError> {
+    Err(FlowyError::not_support())
+  }
+
+  /// Get all subscriptions for all workspaces for a user (email)
+  async fn get_workspace_subscriptions(
+    &self,
+  ) -> Result<Vec<WorkspaceSubscriptionStatus>, FlowyError> {
+    Err(FlowyError::not_support())
+  }
+
+  /// Get the workspace subscriptions for a workspace
+  async fn get_workspace_subscription_one(
+    &self,
+    workspace_id: String,
+  ) -> Result<Vec<WorkspaceSubscriptionStatus>, FlowyError> {
+    Err(FlowyError::not_support())
+  }
+
+  async fn cancel_workspace_subscription(
+    &self,
+    workspace_id: String,
+    plan: SubscriptionPlan,
+    reason: Option<String>,
+  ) -> Result<(), FlowyError> {
+    Err(FlowyError::not_support())
+  }
+
+  async fn get_workspace_plan(
+    &self,
+    workspace_id: String,
+  ) -> Result<Vec<SubscriptionPlan>, FlowyError> {
+    Err(FlowyError::not_support())
+  }
+
+  async fn get_workspace_usage(
+    &self,
+    workspace_id: String,
+  ) -> Result<WorkspaceUsageAndLimit, FlowyError> {
+    Err(FlowyError::not_support())
+  }
+
+  async fn get_billing_portal_url(&self) -> Result<String, FlowyError> {
+    Err(FlowyError::not_support())
+  }
+
+  async fn update_workspace_subscription_payment_period(
+    &self,
+    workspace_id: String,
+    plan: SubscriptionPlan,
+    recurring_interval: RecurringInterval,
+  ) -> Result<(), FlowyError> {
+    Err(FlowyError::not_support())
+  }
+
+  async fn get_subscription_plan_details(&self) -> Result<Vec<SubscriptionPlanDetail>, FlowyError> {
+    Err(FlowyError::not_support())
+  }
+
+  async fn get_workspace_setting(
+    &self,
+    workspace_id: &str,
+  ) -> Result<AFWorkspaceSettings, FlowyError> {
+    Err(FlowyError::not_support())
+  }
+
+  async fn update_workspace_setting(
+    &self,
+    workspace_id: &str,
+    workspace_settings: AFWorkspaceSettingsChange,
+  ) -> Result<AFWorkspaceSettings, FlowyError> {
+    Err(FlowyError::not_support())
+  }
 }
 
 pub type UserUpdateReceiver = tokio::sync::mpsc::Receiver<UserUpdate>;
@@ -248,13 +373,12 @@ pub struct UserUpdate {
   pub encryption_sign: String,
 }
 
-pub fn uuid_from_map(map: &HashMap<String, String>) -> Result<Uuid, Error> {
+pub fn uuid_from_map(map: &HashMap<String, String>) -> Result<Uuid, FlowyError> {
   let uuid = map
     .get("uuid")
     .ok_or_else(|| FlowyError::new(ErrorCode::MissingAuthField, "Missing uuid field"))?
     .as_str();
-  let uuid = Uuid::from_str(uuid)?;
-  Ok(uuid)
+  Uuid::from_str(uuid).map_err(internal_error)
 }
 
 #[derive(Debug)]

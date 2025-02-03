@@ -6,7 +6,6 @@ import 'package:appflowy/plugins/database/grid/presentation/layout/sizes.dart';
 import 'package:appflowy/plugins/database/widgets/setting/database_layout_selector.dart';
 import 'package:appflowy/plugins/database/widgets/group/database_group.dart';
 import 'package:appflowy/plugins/database/widgets/setting/setting_property_list.dart';
-import 'package:appflowy_popover/appflowy_popover.dart';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flowy_infra/theme_extension.dart';
 import 'package:flowy_infra_ui/flowy_infra_ui.dart';
@@ -23,7 +22,7 @@ extension DatabaseSettingActionExtension on DatabaseSettingAction {
   FlowySvgData iconData() {
     switch (this) {
       case DatabaseSettingAction.showProperties:
-        return FlowySvgs.properties_s;
+        return FlowySvgs.multiselect_s;
       case DatabaseSettingAction.showLayout:
         return FlowySvgs.database_layout_m;
       case DatabaseSettingAction.showGroup:
@@ -80,8 +79,9 @@ extension DatabaseSettingActionExtension on DatabaseSettingAction {
         height: GridSize.popoverItemHeight,
         child: FlowyButton(
           hoverColor: AFThemeExtension.of(context).lightGreyHover,
-          text: FlowyText.medium(
+          text: FlowyText(
             title(),
+            lineHeight: 1.0,
             color: AFThemeExtension.of(context).textColor,
           ),
           leftIcon: FlowySvg(

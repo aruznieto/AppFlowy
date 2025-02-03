@@ -1,18 +1,19 @@
+import 'package:flutter/material.dart';
+
 import 'package:appflowy/generated/flowy_svgs.g.dart';
 import 'package:appflowy/generated/locale_keys.g.dart';
-import 'package:appflowy/mobile/presentation/base/app_bar_actions.dart';
+import 'package:appflowy/mobile/presentation/base/app_bar/app_bar_actions.dart';
 import 'package:appflowy/mobile/presentation/base/option_color_list.dart';
 import 'package:appflowy/mobile/presentation/widgets/flowy_mobile_search_text_field.dart';
 import 'package:appflowy/mobile/presentation/widgets/widgets.dart';
 import 'package:appflowy/plugins/base/drag_handler.dart';
-import 'package:appflowy/plugins/database/application/cell/bloc/select_option_editor_bloc.dart';
+import 'package:appflowy/plugins/database/application/cell/bloc/select_option_cell_editor_bloc.dart';
 import 'package:appflowy/plugins/database/application/cell/cell_controller_builder.dart';
 import 'package:appflowy/plugins/database/widgets/cell_editor/extension.dart';
 import 'package:appflowy_backend/protobuf/flowy-database2/field_entities.pbenum.dart';
 import 'package:appflowy_backend/protobuf/flowy-database2/select_option_entities.pb.dart';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flowy_infra_ui/flowy_infra_ui.dart';
-import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:protobuf/protobuf.dart';
@@ -55,8 +56,9 @@ class _MobileSelectOptionEditorState extends State<MobileSelectOptionEditor> {
       child: BlocProvider(
         create: (context) => SelectOptionCellEditorBloc(
           cellController: widget.cellController,
-        )..add(const SelectOptionEditorEvent.initial()),
-        child: BlocBuilder<SelectOptionCellEditorBloc, SelectOptionEditorState>(
+        ),
+        child: BlocBuilder<SelectOptionCellEditorBloc,
+            SelectOptionCellEditorState>(
           builder: (context, state) {
             return Column(
               mainAxisSize: MainAxisSize.min,
@@ -110,7 +112,7 @@ class _MobileSelectOptionEditorState extends State<MobileSelectOptionEditor> {
         onDelete: () {
           context
               .read<SelectOptionCellEditorBloc>()
-              .add(SelectOptionEditorEvent.deleteOption(option!));
+              .add(SelectOptionCellEditorEvent.deleteOption(option!));
           _popOrBack();
         },
         onUpdate: (name, color) {
@@ -120,7 +122,7 @@ class _MobileSelectOptionEditorState extends State<MobileSelectOptionEditor> {
           }
           option.freeze();
           context.read<SelectOptionCellEditorBloc>().add(
-            SelectOptionEditorEvent.updateOption(
+            SelectOptionCellEditorEvent.updateOption(
               option.rebuild((p0) {
                 if (name != null) {
                   p0.name = name;
@@ -142,16 +144,16 @@ class _MobileSelectOptionEditorState extends State<MobileSelectOptionEditor> {
           _SearchField(
             controller: searchController,
             hintText: LocaleKeys.grid_selectOption_searchOrCreateOption.tr(),
-            onSubmitted: (option) {
+            onSubmitted: (_) {
               context
                   .read<SelectOptionCellEditorBloc>()
-                  .add(SelectOptionEditorEvent.trySelectOption(option));
+                  .add(const SelectOptionCellEditorEvent.submitTextField());
               searchController.clear();
             },
             onChanged: (value) {
               typingOption = value;
               context.read<SelectOptionCellEditorBloc>().add(
-                    SelectOptionEditorEvent.selectMultipleOptions(
+                    SelectOptionCellEditorEvent.selectMultipleOptions(
                       [],
                       value,
                     ),
@@ -164,18 +166,18 @@ class _MobileSelectOptionEditorState extends State<MobileSelectOptionEditor> {
             onCreateOption: (optionName) {
               context
                   .read<SelectOptionCellEditorBloc>()
-                  .add(SelectOptionEditorEvent.newOption(optionName));
+                  .add(const SelectOptionCellEditorEvent.createOption());
               searchController.clear();
             },
-            onCheck: (option, value) {
-              if (value) {
+            onCheck: (option, isSelected) {
+              if (isSelected) {
                 context
                     .read<SelectOptionCellEditorBloc>()
-                    .add(SelectOptionEditorEvent.selectOption(option.id));
+                    .add(SelectOptionCellEditorEvent.unselectOption(option.id));
               } else {
                 context
                     .read<SelectOptionCellEditorBloc>()
-                    .add(SelectOptionEditorEvent.unSelectOption(option.id));
+                    .add(SelectOptionCellEditorEvent.selectOption(option.id));
               }
             },
             onMoreOptions: (option) {
@@ -253,29 +255,33 @@ class _OptionList extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return BlocBuilder<SelectOptionCellEditorBloc, SelectOptionEditorState>(
+    return BlocBuilder<SelectOptionCellEditorBloc, SelectOptionCellEditorState>(
       builder: (context, state) {
         // existing options
         final List<Widget> cells = [];
 
         // create an option cell
-        final createOption = state.createOption;
-        if (createOption != null) {
+        if (state.createSelectOptionSuggestion != null) {
           cells.add(
             _CreateOptionCell(
-              optionName: createOption,
-              onTap: () => onCreateOption(createOption),
+              name: state.createSelectOptionSuggestion!.name,
+              color: state.createSelectOptionSuggestion!.color,
+              onTap: () => onCreateOption(
+                state.createSelectOptionSuggestion!.name,
+              ),
             ),
           );
         }
 
         cells.addAll(
           state.options.map(
-            (option) => _SelectOption(
-              fieldType: fieldType,
+            (option) => MobileSelectOption(
+              indicator: fieldType == FieldType.MultiSelect
+                  ? MobileSelectedOptionIndicator.multi
+                  : MobileSelectedOptionIndicator.single,
               option: option,
-              checked: state.selectedOptions.contains(option),
-              onCheck: (value) => onCheck(option, value),
+              isSelected: state.selectedOptions.contains(option),
+              onTap: (value) => onCheck(option, value),
               onMoreOptions: () => onMoreOptions(option),
             ),
           ),
@@ -294,20 +300,23 @@ class _OptionList extends StatelessWidget {
   }
 }
 
-class _SelectOption extends StatelessWidget {
-  const _SelectOption({
-    required this.fieldType,
+class MobileSelectOption extends StatelessWidget {
+  const MobileSelectOption({
+    super.key,
+    required this.indicator,
     required this.option,
-    required this.checked,
-    required this.onCheck,
-    required this.onMoreOptions,
+    required this.isSelected,
+    required this.onTap,
+    this.showMoreOptionsButton = true,
+    this.onMoreOptions,
   });
 
-  final FieldType fieldType;
+  final MobileSelectedOptionIndicator indicator;
   final SelectOptionPB option;
-  final bool checked;
-  final void Function(bool value) onCheck;
-  final VoidCallback onMoreOptions;
+  final bool isSelected;
+  final void Function(bool value) onTap;
+  final bool showMoreOptionsButton;
+  final VoidCallback? onMoreOptions;
 
   @override
   Widget build(BuildContext context) {
@@ -316,7 +325,7 @@ class _SelectOption extends StatelessWidget {
       child: GestureDetector(
         // no need to add click effect, so using gesture detector
         behavior: HitTestBehavior.translucent,
-        onTap: () => onCheck(!checked),
+        onTap: () => onTap(isSelected),
         child: Row(
           children: [
             // checked or selected icon
@@ -324,32 +333,37 @@ class _SelectOption extends StatelessWidget {
               height: 20,
               width: 20,
               child: _IsSelectedIndicator(
-                fieldType: fieldType,
-                isSelected: checked,
+                indicator: indicator,
+                isSelected: isSelected,
               ),
             ),
             // padding
             const HSpace(12),
             // option tag
             Expanded(
-              child: SelectOptionTag(
-                option: option,
-                padding: const EdgeInsets.symmetric(
-                  vertical: 10,
+              child: Align(
+                alignment: AlignmentDirectional.centerStart,
+                child: SelectOptionTag(
+                  option: option,
+                  padding: const EdgeInsets.symmetric(
+                    vertical: 10,
+                    horizontal: 14,
+                  ),
+                  textAlign: TextAlign.center,
+                  fontSize: 15.0,
                 ),
-                textAlign: TextAlign.center,
-                fontSize: 15.0,
-                isExpanded: true,
               ),
             ),
-            const HSpace(24),
-            // more options
-            FlowyIconButton(
-              icon: const FlowySvg(
-                FlowySvgs.m_field_more_s,
+            if (showMoreOptionsButton) ...[
+              const HSpace(24),
+              // more options
+              FlowyIconButton(
+                icon: const FlowySvg(
+                  FlowySvgs.m_field_more_s,
+                ),
+                onPressed: onMoreOptions,
               ),
-              onPressed: onMoreOptions,
-            ),
+            ],
           ],
         ),
       ),
@@ -359,11 +373,13 @@ class _SelectOption extends StatelessWidget {
 
 class _CreateOptionCell extends StatelessWidget {
   const _CreateOptionCell({
-    required this.optionName,
+    required this.name,
+    required this.color,
     required this.onTap,
   });
 
-  final String optionName;
+  final String name;
+  final SelectOptionColorPB color;
   final VoidCallback onTap;
 
   @override
@@ -375,19 +391,22 @@ class _CreateOptionCell extends StatelessWidget {
         onTap: onTap,
         child: Row(
           children: [
-            FlowyText.medium(
+            FlowyText(
               LocaleKeys.grid_selectOption_create.tr(),
               color: Theme.of(context).hintColor,
             ),
             const HSpace(8),
             Expanded(
-              child: SelectOptionTag(
-                isExpanded: true,
-                name: optionName,
-                color: Theme.of(context).colorScheme.surfaceVariant,
-                textAlign: TextAlign.center,
-                padding: const EdgeInsets.symmetric(
-                  vertical: 10,
+              child: Align(
+                alignment: AlignmentDirectional.centerStart,
+                child: SelectOptionTag(
+                  name: name,
+                  color: color.toColor(context),
+                  textAlign: TextAlign.center,
+                  padding: const EdgeInsets.symmetric(
+                    vertical: 10,
+                    horizontal: 14,
+                  ),
                 ),
               ),
             ),
@@ -484,13 +503,15 @@ class _MoreOptionsState extends State<_MoreOptions> {
   }
 }
 
+enum MobileSelectedOptionIndicator { single, multi }
+
 class _IsSelectedIndicator extends StatelessWidget {
   const _IsSelectedIndicator({
-    required this.fieldType,
+    required this.indicator,
     required this.isSelected,
   });
 
-  final FieldType fieldType;
+  final MobileSelectedOptionIndicator indicator;
   final bool isSelected;
 
   @override
@@ -502,7 +523,7 @@ class _IsSelectedIndicator extends StatelessWidget {
               color: Theme.of(context).colorScheme.primary,
             ),
             child: Center(
-              child: fieldType == FieldType.MultiSelect
+              child: indicator == MobileSelectedOptionIndicator.multi
                   ? FlowySvg(
                       FlowySvgs.checkmark_tiny_s,
                       color: Theme.of(context).colorScheme.onPrimary,

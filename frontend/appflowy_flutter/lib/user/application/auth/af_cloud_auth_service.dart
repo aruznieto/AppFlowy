@@ -56,7 +56,7 @@ class AppFlowyCloudAuthService implements AuthService {
       (data) async {
         // Open the webview with oauth url
         final uri = Uri.parse(data.oauthUrl);
-        final isSuccess = await afLaunchUrl(
+        final isSuccess = await afLaunchUri(
           uri,
           mode: LaunchMode.externalApplication,
           webOnlyWindowName: '_self',
@@ -100,7 +100,10 @@ class AppFlowyCloudAuthService implements AuthService {
     required String email,
     Map<String, String> params = const {},
   }) async {
-    throw UnimplementedError();
+    return _backendAuthService.signInWithMagicLink(
+      email: email,
+      params: params,
+    );
   }
 
   @override
@@ -118,6 +121,8 @@ extension ProviderTypePBExtension on ProviderTypePB {
         return ProviderTypePB.Google;
       case 'discord':
         return ProviderTypePB.Discord;
+      case 'apple':
+        return ProviderTypePB.Apple;
       default:
         throw UnimplementedError();
     }
